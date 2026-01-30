@@ -13,11 +13,15 @@
 
 **Full Demo** - UI, segments, auto-detection, filename builder, presets
 
-https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.mp4
+![FlowPath Demo](assets/flowpath-preview.gif)
+
+[Watch full video](https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.mp4)
 
 **7 Beautiful Themes** - Find your style
 
-https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/themes.mp4
+![FlowPath Themes](assets/themes-preview.gif)
+
+[Watch full video](https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/themes.mp4)
 
 ---
 
