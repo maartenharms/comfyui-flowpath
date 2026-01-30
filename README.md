@@ -16,7 +16,7 @@ https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.m
 
 - 🎯 **Template Variables** - `{model}`, `{lora}`, `{seed}`, `{date}` and more
 - 🔍 **Auto-Detection** - Automatically detects Model, LoRA, Resolution, Seed
-- 🎨 **6 Beautiful Themes** - Customize the look to match your style
+- 🎨 **7 Beautiful Themes** - Customize the look to match your style
 - 💾 **Global Presets** - Save once, use everywhere across all workflows
 - 📤 **Multi-Output Support** - Handle multiple outputs with Output Labels
 - 📝 **Dual Outputs** - Separate `path` and `filename` outputs for full Image Saver compatibility
@@ -30,7 +30,7 @@ https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.m
 | 🎯 **Template Variables** | Use `{model}`, `{lora}`, `{resolution}`, `{date}`, `{label}` in custom folders |
 | 🔍 **Auto-Detection** | Automatically detects Model, LoRA, Resolution, and Seed from your workflow |
 | ↕️ **Drag & Drop** | Reorder path segments with intuitive drag-and-drop |
-| 🎨 **6 Themes** | Ocean Blue, Forest Green, Pink Pony Club, Odie, Umbrael's Umbrage, Plain Jane |
+| 🎨 **7 Themes** | Ocean Blue, Forest Green, Pink Pony Club, Odie, Umbrael's Umbrage, Plain Jane, The Dark Knight |
 | 💾 **Smart Presets** | 4 defaults + unlimited custom presets with cross-workflow sync |
 | 👁️ **Live Preview** | See your path and filename previews before generating |
 | 📡 **Wireless Support** | Works with Anything Everywhere for clean workflows |
@@ -354,6 +354,7 @@ Choose from **6 beautiful themes** in Settings → FlowPath → Theme:
 | 🧡 **Odie** | Orange | Sandy Tan | Warm and friendly (named after my cat!) |
 | 💜 **Umbrael's Umbrage** | Purple | Gold | Regal and mysterious (DEFAULT) |
 | ⚪ **Plain Jane** | Gray | Gray | Simple and minimal |
+| 🦇 **The Dark Knight** | Black | Yellow | For when Gotham needs you |
 
 ---
 

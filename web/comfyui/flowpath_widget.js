@@ -76,6 +76,16 @@ const THEMES = {
     accent: "#9ca3af", // Light gray
     secondary: "#4b5563",
     background: "rgba(243, 244, 246, 0.03)" // Very subtle gray background
+  },
+  batman: {
+    name: "The Dark Knight",
+    primary: "#1a1a1a",
+    primaryLight: "rgba(26, 26, 26, 0.5)",
+    primaryDark: "rgba(0, 0, 0, 0.8)",
+    gradient: "linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(255, 204, 0, 0.1))",
+    accent: "#ffcc00", // Batman yellow
+    secondary: "#333333",
+    background: "rgba(0, 0, 0, 0.7)" // Deep dark background
   }
 };
 
@@ -555,7 +565,8 @@ app.registerExtension({
         { value: "pinkpony", text: "Pink Pony Club" },
         { value: "odie", text: "Odie" },
         { value: "umbrael", text: "Umbrael's Umbrage" },
-        { value: "plainjane", text: "Plain Jane" }
+        { value: "plainjane", text: "Plain Jane" },
+        { value: "batman", text: "The Dark Knight" }
       ],
       defaultValue: "umbrael",
       onChange: (value) => {

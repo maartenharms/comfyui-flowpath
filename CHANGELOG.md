@@ -91,6 +91,7 @@ Example: `{name}_%seed` → `Umbrael_12345678`
 - Odie (Orange)
 - Umbrael's Umbrage (Purple - Default)
 - Plain Jane (Gray)
+- The Dark Knight (Batman - Black & Yellow)
 
 #### User Experience
 - Toast notifications for success/error/warning messages
