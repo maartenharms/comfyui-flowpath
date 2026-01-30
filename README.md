@@ -9,8 +9,17 @@
 
 ---
 
-<!-- Main demo video: UI overview, segments, config, auto-detection, filename builder, presets -->
+### See It In Action
+
+**Full Demo** - UI, segments, auto-detection, filename builder, presets
+
 https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.mp4
+
+**7 Beautiful Themes** - Find your style
+
+https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/themes.mp4
+
+---
 
 **FlowPath** is a **free and open source** ComfyUI custom node that intelligently organizes your AI-generated images. Say goodbye to messy output folders!
 

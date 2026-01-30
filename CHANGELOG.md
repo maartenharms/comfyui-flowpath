@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### How It Works
 | Node | Connect | Result |
 |------|---------|--------|
-| **Save Image** | `path` → `filename_prefix` | `path_00001.png` |
-| **Image Saver** | `path` → `path`, `filename` → `filename` | `path/filename.png` |
+| **Save Image** | `path` → `filename_prefix` | `path_#####.png` |
+| **Image Saver** | `path` → `path`, `filename` → `filename` | `path/filename_##.png` |
 
 #### How to Use with Image Saver
 1. Expand the **📝 Filename** section
@@ -109,7 +109,7 @@ Example: `{name}_%seed` → `Umbrael_12345678`
 
 ### Documentation
 - Comprehensive README with all features documented
-- 3 example workflows (Basic, Wireless, Multi-Output)
+- 4 example workflows (Basic, Wireless, Multi-Output, Image Saver)
 - Troubleshooting guide
 
 ---
