@@ -1,0 +1,10 @@
+{
+    "author": "maartenharms",
+    "title": "FlowPath",
+    "reference": "https://github.com/maartenharms/comfyui-flowpath",
+    "files": [
+        "https://github.com/maartenharms/comfyui-flowpath"
+    ],
+    "install_type": "git-clone",
+    "description": "Intelligent path organization for ComfyUI with drag-drop segments, auto-detection (Model, LoRA, Resolution, Seed), template variables, global presets with cross-workflow sync, multi-output support with Output Labels, and 6 beautiful themes. Automatically organize your AI-generated images!"
+}
