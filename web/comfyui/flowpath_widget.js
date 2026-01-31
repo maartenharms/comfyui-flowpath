@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-console.log("🎯 FlowPath Widget JavaScript file loaded!");
+console.log("🌊 FlowPath v1.2.0 loaded");
 
 // Helper function to chain callbacks
 function chainCallback(object, property, callback) {
@@ -25,7 +25,7 @@ const THEMES = {
     gradient: "linear-gradient(135deg, rgba(66, 153, 225, 0.2), rgba(20, 184, 166, 0.1))",
     accent: "#14b8a6", // Teal
     secondary: "#60a5fa",
-    background: "rgba(0, 0, 0, 0.05)" // Subtle dark background
+    background: "linear-gradient(180deg, rgba(10, 30, 50, 0.5) 0%, rgba(20, 60, 80, 0.3) 100%)"
   },
   forest: {
     name: "Forest Green",
@@ -35,7 +35,7 @@ const THEMES = {
     gradient: "linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(217, 119, 6, 0.1))",
     accent: "#d97706", // Amber/Earth
     secondary: "#34d399",
-    background: "rgba(0, 0, 0, 0.05)" // Subtle dark background
+    background: "linear-gradient(180deg, rgba(10, 30, 20, 0.5) 0%, rgba(30, 50, 30, 0.3) 100%)"
   },
   pinkpony: {
     name: "Pink Pony Club",
@@ -45,7 +45,7 @@ const THEMES = {
     gradient: "linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(255, 255, 255, 0.15))",
     accent: "#ffffff", // White
     secondary: "#f472b6",
-    background: "rgba(255, 255, 255, 0.08)" // Light premium background
+    background: "linear-gradient(180deg, rgba(50, 20, 40, 0.5) 0%, rgba(80, 30, 60, 0.3) 100%)"
   },
   odie: {
     name: "Odie",
@@ -55,7 +55,7 @@ const THEMES = {
     gradient: "linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(212, 165, 116, 0.15))",
     accent: "#d4a574", // Sandy tan/cream
     secondary: "#fb923c",
-    background: "rgba(255, 247, 237, 0.05)" // Warm light background
+    background: "linear-gradient(180deg, rgba(40, 25, 15, 0.5) 0%, rgba(60, 40, 25, 0.3) 100%)"
   },
   umbrael: {
     name: "Umbrael's Umbrage",
@@ -65,7 +65,7 @@ const THEMES = {
     gradient: "linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(251, 191, 36, 0.1))",
     accent: "#fbbf24", // Gold
     secondary: "#a855f7",
-    background: "rgba(17, 24, 39, 0.6)" // Dark royal background
+    background: "linear-gradient(180deg, rgba(17, 24, 39, 0.6) 0%, rgba(30, 20, 50, 0.4) 100%)"
   },
   plainjane: {
     name: "Plain Jane",
@@ -75,17 +75,17 @@ const THEMES = {
     gradient: "linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(156, 163, 175, 0.1))",
     accent: "#9ca3af", // Light gray
     secondary: "#4b5563",
-    background: "rgba(243, 244, 246, 0.03)" // Very subtle gray background
+    background: "linear-gradient(180deg, rgba(30, 30, 35, 0.5) 0%, rgba(40, 40, 45, 0.3) 100%)"
   },
   batman: {
     name: "The Dark Knight",
     primary: "#1a1a1a",
     primaryLight: "rgba(26, 26, 26, 0.5)",
     primaryDark: "rgba(0, 0, 0, 0.8)",
-    gradient: "linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(255, 204, 0, 0.1))",
+    gradient: "linear-gradient(135deg, rgba(0, 0, 0, 0.6), rgba(255, 204, 0, 0.05))",
     accent: "#ffcc00", // Batman yellow
     secondary: "#333333",
-    background: "rgba(0, 0, 0, 0.7)" // Deep dark background
+    background: "linear-gradient(180deg, rgba(0, 0, 0, 0.8) 0%, rgba(15, 15, 8, 0.6) 100%)"
   }
 };
 
@@ -95,8 +95,12 @@ let globalSettings = {
   enableScrolling: true, // Scrolling enabled by default for reliable display
   autoDetectModel: "manual", // "manual" or "auto"
   autoDetectLora: true,
-  loraPathFormat: "primary" // "primary", "primaryCount", "all", "separate"
-};
+  loraPathFormat: "primary", // "primary", "primaryCount", "all", "separate"
+  stickyPreview: true, // Keep output preview visible at top when scrolling
+   showEmojis: true, // Show emojis in section headers and UI elements
+   hideDefaultPresets: false, // Hide default presets in the presets list
+   showLoadingAnimation: false // Show animation when loading presets
+ };
 
 // Inject global CSS for dropdown styling (only once)
 if (!document.getElementById('gensort-pro-styles')) {
@@ -123,7 +127,6 @@ if (!document.getElementById('gensort-pro-styles')) {
   document.head.appendChild(style);
 }
 
-console.log("🎯 Registering FlowPath extension...");
 
 // Toast notification system
 function showToast(message, type = "info", duration = 3000) {
@@ -211,7 +214,6 @@ function showToast(message, type = "info", duration = 3000) {
 
 // Detection helper functions (defined outside extension for accessibility)
 function detectModelFromWorkflow(graph) {
-  console.log("[FlowPath] Detecting model from workflow...");
   
   if (!graph || !graph._nodes) {
     console.warn("[FlowPath] No graph available for model detection");
@@ -252,11 +254,9 @@ function detectModelFromWorkflow(graph) {
   }
 
   if (foundModels.length === 0) {
-    console.log("[FlowPath] No checkpoint node found in workflow");
     return null;
   }
 
-  console.log("[FlowPath] Detected models:", foundModels);
   
   // Return first model, but include count for notification
   return {
@@ -267,7 +267,6 @@ function detectModelFromWorkflow(graph) {
 }
 
 function detectSeedFromWorkflow(graph) {
-  console.log("[FlowPath] Detecting seed from workflow...");
   
   if (!graph || !graph._nodes) {
     console.warn("[FlowPath] No graph available for seed detection");
@@ -297,7 +296,6 @@ function detectSeedFromWorkflow(graph) {
       
       if (seedWidget && seedWidget.value !== undefined && seedWidget.value !== null) {
         const seed = String(seedWidget.value);
-        console.log("[FlowPath] Detected noise_seed from", node.type, ":", seed);
         return seed;
       }
     }
@@ -311,18 +309,15 @@ function detectSeedFromWorkflow(graph) {
       
       if (seedWidget && seedWidget.value !== undefined && seedWidget.value !== null) {
         const seed = String(seedWidget.value);
-        console.log("[FlowPath] Detected seed:", seed);
         return seed;
       }
     }
   }
 
-  console.log("[FlowPath] No sampler or noise generator node with seed found in workflow");
   return null;
 }
 
 function detectLorasFromWorkflow(graph) {
-  console.log("[FlowPath] Detecting LoRAs from workflow...");
   
   if (!graph || !graph._nodes) {
     console.warn("[FlowPath] No graph available for LoRA detection");
@@ -340,31 +335,26 @@ function detectLorasFromWorkflow(graph) {
 
   // Search for all nodes in the workflow
   for (const node of graph._nodes) {
-    console.log("[FlowPath] Checking node:", node.type);
     
     // Handle Lora Manager nodes specially
     if (node.type === "Lora Loader (LoraManager)" || 
         node.comfyClass === "Lora Loader (LoraManager)" ||
         node.type === "lora") {  // LoRA Manager may also appear as lowercase "lora"
-      console.log("[FlowPath] Found LoRA Manager node:", node.type);
       
       // LoRA Manager stores structured data in lorasWidget
       const lorasWidget = node.lorasWidget;
       
       if (lorasWidget && lorasWidget.value && Array.isArray(lorasWidget.value)) {
         const lorasData = lorasWidget.value;
-        console.log("[FlowPath] LoRA Manager data:", lorasData);
         
         // Only extract LoRAs that are active (checked)
         lorasData.forEach(lora => {
           if (lora && lora.name && lora.active) {
             const loraName = lora.name;
             if (!loraNames.includes(loraName)) {
-              console.log("[FlowPath] Extracted ACTIVE LoRA from Manager:", loraName);
               loraNames.push(loraName);
             }
           } else if (lora && lora.name && !lora.active) {
-            console.log("[FlowPath] Skipping INACTIVE LoRA:", lora.name);
           }
         });
       } else {
@@ -373,7 +363,6 @@ function detectLorasFromWorkflow(graph) {
         
         if (inputWidget && inputWidget.value) {
           const loraText = inputWidget.value;
-          console.log("[FlowPath] LoRA Manager text (fallback):", loraText);
           
           // Parse LoRA syntax: <lora:name:strength>
           LORA_PATTERN.lastIndex = 0; // Reset regex
@@ -381,7 +370,6 @@ function detectLorasFromWorkflow(graph) {
           while ((match = LORA_PATTERN.exec(loraText)) !== null) {
             const loraName = match[1]; // First capture group is the name
             if (loraName && !loraNames.includes(loraName)) {
-              console.log("[FlowPath] Extracted LoRA from Manager (fallback):", loraName);
               loraNames.push(loraName);
             }
           }
@@ -399,7 +387,6 @@ function detectLorasFromWorkflow(graph) {
     ];
     
     if (standardLoraTypes.some(type => node.type.includes(type) || type.includes(node.type))) {
-      console.log("[FlowPath] Found standard LoRA node:", node.type);
       
       // Find the widget that contains the LoRA name
       const loraWidget = node.widgets?.find(w => 
@@ -407,7 +394,6 @@ function detectLorasFromWorkflow(graph) {
       );
       
       if (loraWidget) {
-        console.log("[FlowPath] LoRA widget found:", loraWidget.name, "value type:", typeof loraWidget.value, "value:", loraWidget.value);
       }
       
       if (loraWidget && loraWidget.value && loraWidget.value !== "None") {
@@ -442,7 +428,6 @@ function detectLorasFromWorkflow(graph) {
         
         // Only add if not already in the list and not empty
         if (loraName && !loraNames.includes(loraName)) {
-          console.log("[FlowPath] Added standard LoRA:", loraName);
           loraNames.push(loraName);
         }
       }
@@ -462,13 +447,11 @@ function detectLorasFromWorkflow(graph) {
     ];
     
     if (textNodeTypes.some(type => node.type === type || node.type.includes("TextEncode") || node.type.includes("Wildcard"))) {
-      console.log("[FlowPath] Checking text node for embedded LoRAs:", node.type);
       
       // Check all widgets for text content
       if (node.widgets) {
         for (const widget of node.widgets) {
           if (widget.value && typeof widget.value === 'string' && widget.value.includes('<lora:')) {
-            console.log("[FlowPath] Found embedded LoRA syntax in widget:", widget.name);
             
             // Parse LoRA syntax: <lora:name:strength>
             LORA_PATTERN.lastIndex = 0; // Reset regex
@@ -476,7 +459,6 @@ function detectLorasFromWorkflow(graph) {
             while ((match = LORA_PATTERN.exec(widget.value)) !== null) {
               const loraName = match[1]; // First capture group is the name
               if (loraName && !loraNames.includes(loraName)) {
-                console.log("[FlowPath] Extracted embedded LoRA:", loraName);
                 loraNames.push(loraName);
               }
             }
@@ -486,7 +468,6 @@ function detectLorasFromWorkflow(graph) {
     }
   }
 
-  console.log("[FlowPath] Detected LoRAs:", loraNames);
   return loraNames;
 }
 
@@ -521,7 +502,6 @@ function formatLoraPath(loraArray, mode) {
 }
 
 function detectResolutionFromWorkflow(graph) {
-  console.log("[FlowPath] Detecting resolution from workflow...");
   
   if (!graph || !graph._nodes) {
     console.warn("[FlowPath] No graph available for resolution detection");
@@ -540,7 +520,6 @@ function detectResolutionFromWorkflow(graph) {
   // Search for all latent image nodes
   for (const node of graph._nodes) {
     if (latentNodeTypes.some(type => node.type === type || node.comfyClass === type)) {
-      console.log("[FlowPath] Found latent node:", node.type);
       
       // Try to find width and height widgets
       const widthWidget = node.widgets?.find(w => w.name === "width");
@@ -556,11 +535,9 @@ function detectResolutionFromWorkflow(graph) {
   }
 
   if (foundResolutions.length === 0) {
-    console.log("[FlowPath] No latent node with resolution found in workflow");
     return null;
   }
 
-  console.log("[FlowPath] Detected resolutions:", foundResolutions);
   
   // Return first resolution, but include count for notification
   return {
@@ -576,7 +553,7 @@ app.registerExtension({
   async setup() {
     // Add theme setting to ComfyUI's settings menu
     app.ui.settings.addSetting({
-      id: "🌊 FlowPath.theme",
+      id: "🌊 FlowPath.Theme",
       name: "Theme",
       type: "combo",
       tooltip: "Choose a color theme for the FlowPath node. Each theme has unique colors and gradients.",
@@ -592,7 +569,6 @@ app.registerExtension({
       defaultValue: "umbrael",
       onChange: (value) => {
         globalSettings.theme = value;
-        console.log("[FlowPath] Theme changed to:", value);
         
         // Trigger re-render of all FlowPath nodes
         const nodes = app.graph._nodes.filter(n => n.comfyClass === "FlowPath");
@@ -608,7 +584,7 @@ app.registerExtension({
 
     // Add auto-detect model setting
     app.ui.settings.addSetting({
-      id: "🌊 FlowPath.autoDetectModel",
+      id: "🌊 FlowPath.Auto-Detect Model",
       name: "Auto-Detect Model",
       type: "combo",
       tooltip: "Choose when to auto-detect the model from your workflow. 'Manual' requires clicking the detect button.",
@@ -619,26 +595,24 @@ app.registerExtension({
       defaultValue: "manual",
       onChange: (value) => {
         globalSettings.autoDetectModel = value;
-        console.log("[FlowPath] Auto-detect model changed to:", value);
       }
     });
 
     // Add auto-detect LoRA setting
     app.ui.settings.addSetting({
-      id: "🌊 FlowPath.autoDetectLora",
+      id: "🌊 FlowPath.Auto-Detect LoRAs",
       name: "Auto-Detect LoRAs",
       type: "boolean",
       tooltip: "Automatically detect LoRAs from your workflow including LoRA Manager support. Respects active/inactive state.",
       defaultValue: true,
       onChange: (value) => {
         globalSettings.autoDetectLora = value;
-        console.log("[FlowPath] Auto-detect LoRA changed to:", value);
       }
     });
 
     // Add LoRA path format setting
     app.ui.settings.addSetting({
-      id: "🌊 FlowPath.loraPathFormat",
+      id: "🌊 FlowPath.LoRA Path Format",
       name: "LoRA Path Format",
       type: "combo",
       tooltip: "Primary Only: Uses first LoRA name | Primary + Count: Adds total count (e.g., LoraName_3) | All: Lists all LoRAs comma-separated | Separate: Creates individual folders per LoRA",
@@ -651,7 +625,6 @@ app.registerExtension({
       defaultValue: "primary",
       onChange: (value) => {
         globalSettings.loraPathFormat = value;
-        console.log("[FlowPath] LoRA path format changed to:", value);
         
         // Update all nodes
         const nodes = app.graph._nodes.filter(n => n.comfyClass === "FlowPath");
@@ -663,23 +636,101 @@ app.registerExtension({
       }
     });
 
-    // Load saved settings
-    const savedTheme = app.ui.settings.getSettingValue("🌊 FlowPath.theme", "umbrael");
-    const savedAutoDetectModel = app.ui.settings.getSettingValue("🌊 FlowPath.autoDetectModel", "manual");
-    const savedAutoDetectLora = app.ui.settings.getSettingValue("🌊 FlowPath.autoDetectLora", true);
-    const savedLoraPathFormat = app.ui.settings.getSettingValue("🌊 FlowPath.loraPathFormat", "primary");
-    
-    globalSettings.theme = savedTheme;
-    globalSettings.autoDetectModel = savedAutoDetectModel;
-    globalSettings.autoDetectLora = savedAutoDetectLora;
-    globalSettings.loraPathFormat = savedLoraPathFormat;
+    // Add sticky preview setting
+    app.ui.settings.addSetting({
+      id: "🌊 FlowPath.Sticky Output Preview",
+      name: "Sticky Output Preview",
+      type: "boolean",
+      tooltip: "Keep the output preview visible at the top of the node when scrolling through segments, config, and presets.",
+      defaultValue: true,
+      onChange: (value) => {
+        globalSettings.stickyPreview = value;
+        
+        // Update all nodes
+        const nodes = app.graph._nodes.filter(n => n.comfyClass === "FlowPath");
+        nodes.forEach(node => {
+          if (node.genSortRender) {
+            node.genSortRender();
+          }
+        });
+      }
+    });
+
+    // Add show emojis setting
+    app.ui.settings.addSetting({
+      id: "🌊 FlowPath.Show Emojis",
+      name: "Show Emojis",
+      type: "boolean",
+      tooltip: "Show emojis in section headers and UI elements. Disable for a cleaner, text-only look.",
+      defaultValue: true,
+      onChange: (value) => {
+        globalSettings.showEmojis = value;
+        
+        // Update all nodes
+        const nodes = app.graph._nodes.filter(n => n.comfyClass === "FlowPath");
+        nodes.forEach(node => {
+          if (node.genSortRender) {
+            node.genSortRender();
+          }
+        });
+      }
+    });
+
+    // Add hide default presets setting
+     app.ui.settings.addSetting({
+       id: "🌊 FlowPath.Hide Default Presets",
+       name: "Hide Default Presets",
+       type: "boolean",
+       tooltip: "Hide the default presets section in the Presets list. Only your custom presets will be shown.",
+       defaultValue: false,
+       onChange: (value) => {
+         globalSettings.hideDefaultPresets = value;
+         
+         // Update all nodes
+         const nodes = app.graph._nodes.filter(n => n.comfyClass === "FlowPath");
+         nodes.forEach(node => {
+           if (node.genSortRender) {
+             node.genSortRender();
+           }
+         });
+       }
+     });
+
+     // Add show loading animation setting
+      app.ui.settings.addSetting({
+        id: "🌊 FlowPath.Preset Loading Animation",
+        name: "Preset Loading Animation",
+        type: "boolean",
+        tooltip: "Show a visual animation when loading presets. When disabled, a toast notification is shown instead.",
+        defaultValue: false,
+        onChange: (value) => {
+          globalSettings.showLoadingAnimation = value;
+        }
+      });
+
+     // Load saved settings
+    const savedTheme = app.ui.settings.getSettingValue("🌊 FlowPath.Theme", "umbrael");
+      const savedAutoDetectModel = app.ui.settings.getSettingValue("🌊 FlowPath.Auto-Detect Model", "manual");
+      const savedAutoDetectLora = app.ui.settings.getSettingValue("🌊 FlowPath.Auto-Detect LoRAs", true);
+      const savedLoraPathFormat = app.ui.settings.getSettingValue("🌊 FlowPath.LoRA Path Format", "primary");
+      const savedStickyPreview = app.ui.settings.getSettingValue("🌊 FlowPath.Sticky Output Preview", true);
+      const savedShowEmojis = app.ui.settings.getSettingValue("🌊 FlowPath.Show Emojis", true);
+      const savedHideDefaultPresets = app.ui.settings.getSettingValue("🌊 FlowPath.Hide Default Presets", false);
+       const savedShowLoadingAnimation = app.ui.settings.getSettingValue("🌊 FlowPath.Preset Loading Animation", false);
+     
+     globalSettings.theme = savedTheme;
+     globalSettings.autoDetectModel = savedAutoDetectModel;
+     globalSettings.autoDetectLora = savedAutoDetectLora;
+     globalSettings.loraPathFormat = savedLoraPathFormat;
+     globalSettings.stickyPreview = savedStickyPreview;
+     globalSettings.showEmojis = savedShowEmojis;
+     globalSettings.hideDefaultPresets = savedHideDefaultPresets;
+     globalSettings.showLoadingAnimation = savedShowLoadingAnimation;
   },
 
   async beforeRegisterNodeDef(nodeType, nodeData, app) {
-    console.log("🎯 beforeRegisterNodeDef called for:", nodeType.comfyClass);
     if (nodeType.comfyClass === "FlowPath") {
       chainCallback(nodeType.prototype, "onNodeCreated", function () {
-        console.log("[FlowPath] Node created, adding custom widget");
 
         const node = this;
         node.serialize_widgets = true;
@@ -705,6 +756,10 @@ app.registerExtension({
         container.className = "gensort-pro-container";
         container.tabIndex = 0; // Make focusable
 
+        // Helper function to conditionally show emoji based on setting
+        const emoji = (emojiChar) => globalSettings.showEmojis ? emojiChar : '';
+        const emojiWithSpace = (emojiChar) => globalSettings.showEmojis ? `${emojiChar} ` : '';
+        
         // Available segment types
         const SEGMENT_TYPES = {
           label: { icon: "🏷️", label: "Output Label", configKey: "node_label", tooltip: "Label for this output - useful when using multiple FlowPath nodes (e.g., Main, Upscaled, Depth)" },
@@ -721,6 +776,12 @@ app.registerExtension({
           lora: { icon: "🎨", label: "LoRA", configKey: "lora_name", tooltip: "LoRA models used in generation. Auto-detects from workflow (supports LoRA Manager)" },
           custom: { icon: "✨", label: "Custom", configKey: null, tooltip: "Custom path segment with template variables: {label}, {model}, {category}, {date}, {lora}, {resolution}, {filetype}, etc." }
         };
+        
+        // Helper to get segment icon (respects emoji setting)
+        const getSegmentIcon = (type) => {
+          const seg = SEGMENT_TYPES[type];
+          return seg && globalSettings.showEmojis ? seg.icon : '';
+        };
 
         // Category-specific name placeholder examples
         const categoryNameExamples = {
@@ -731,12 +792,8 @@ app.registerExtension({
           "Other": "Example: Experiment"
         };
 
-        const defaultSegments = [
-          { type: "category", enabled: true },
-          { type: "name", enabled: true },
-          { type: "content_rating", enabled: true },
-          { type: "date", enabled: true }
-        ];
+        // New nodes start blank - users can load a preset or add segments manually
+        const defaultSegments = [];
 
         // Parse current value
         let currentData = {};
@@ -756,16 +813,39 @@ app.registerExtension({
           date_format: "%Y-%m-%d",
           project_name: "",
           series_name: "",
-          resolution: "1024x1024",
+          resolution: "", // Empty by default - can be auto-detected
           model_name: "",
           lora_name: "",
-          filename_template: "" // Filename pattern - supports FlowPath vars {name} and Image Saver vars %seed
+          filename_template: "", // Filename pattern - supports FlowPath vars {name} and Image Saver vars %seed
+          output_mode: "saveImage" // "saveImage" = path only, "imageSaver" = path + filename
           // seed is NOT stored in config - always detected dynamically from KSampler
         };
         
+        // Ensure output_mode has a default for old workflows that don't have it
+        if (!config.output_mode) {
+          config.output_mode = "saveImage";
+        }
+        
         // Default presets for common use cases
-        const defaultPresets = {
-          "Simple Daily": {
+          const defaultPresets = {
+            "Blank": {
+               segments: [],
+               config: {
+                 file_type: "Image",
+                 category: "Characters",
+                 name: "",
+                 content_rating: "SFW",
+                 date_format: "%Y-%m-%d",
+                 project_name: "",
+                 series_name: "",
+                 resolution: "",
+                 model_name: "",
+                 lora_name: "",
+                 filename_template: ""
+                 // Note: output_mode intentionally omitted to preserve current mode
+               }
+             },
+           "Simple Daily": {
             segments: [
               { type: "file_type", enabled: true },
               { type: "category", enabled: true },
@@ -852,7 +932,6 @@ app.registerExtension({
         const saveGlobalPresets = (globalPresets) => {
           try {
             localStorage.setItem(GLOBAL_PRESETS_KEY, JSON.stringify(globalPresets));
-            console.log("[FlowPath] Global presets saved to localStorage");
           } catch (e) {
             console.warn("[FlowPath] Failed to save global presets to localStorage:", e);
           }
@@ -860,7 +939,6 @@ app.registerExtension({
         
         // Load global presets
         const globalPresets = loadGlobalPresets();
-        console.log("[FlowPath] Loaded global presets:", Object.keys(globalPresets));
         
         // Merge: default presets < global presets < workflow presets (workflow has highest priority)
         let presets = { ...defaultPresets, ...globalPresets, ...(currentData.presets || {}) };
@@ -870,7 +948,6 @@ app.registerExtension({
 
         // MIGRATION: Convert old is_nsfw boolean to new content_rating dropdown
         if (config.hasOwnProperty('is_nsfw')) {
-          console.log("[FlowPath] Migrating old is_nsfw boolean to content_rating dropdown");
           const oldNsfw = config.is_nsfw;
           if (oldNsfw === true) {
             config.content_rating = "NSFW";
@@ -878,34 +955,27 @@ app.registerExtension({
             config.content_rating = "SFW";
           }
           delete config.is_nsfw; // Remove old property
-          console.log("[FlowPath] Migrated to content_rating:", config.content_rating);
         }
         
         // Ensure file_type exists (for old workflows)
         if (!config.file_type) {
           config.file_type = "Image";
-          console.log("[FlowPath] Set default file_type: Image");
         }
         
         // Ensure content_rating exists and is valid (for old workflows)
         if (!config.content_rating || config.content_rating === "None") {
           config.content_rating = "SFW";
-          console.log("[FlowPath] Set default content_rating: SFW");
         }
 
         // Auto-detection on node creation/workflow load
         const runAutoDetection = () => {
           try {
-            console.log("[FlowPath] Running auto-detection on load...");
-            console.log("[FlowPath] Settings - autoDetectModel:", globalSettings.autoDetectModel);
-            console.log("[FlowPath] Settings - autoDetectLora:", globalSettings.autoDetectLora);
 
             // Auto-detect model if setting is "auto" and model_name is empty
             if (globalSettings.autoDetectModel === "auto" && !config.model_name) {
               const detectedModel = detectModelFromWorkflow(app.graph);
               if (detectedModel) {
                 config.model_name = detectedModel;
-                console.log("[FlowPath] Auto-detected model on load:", detectedModel);
               }
             }
 
@@ -922,7 +992,6 @@ app.registerExtension({
                 } else {
                   config.lora_name = formatted;
                 }
-                console.log("[FlowPath] Auto-detected LoRAs on load:", config.lora_name);
               }
             }
             
@@ -949,16 +1018,139 @@ app.registerExtension({
         let defaultPresetsExpanded = true;  // Sub-accordion for default presets
         let customPresetsExpanded = true;   // Sub-accordion for custom presets
 
-        document.addEventListener('dragover', (e) => {
-          if (draggedIndex === null) return;
-          if (!segmentsContentEl) return;
+        // Track drop indicator state at document level for smooth UX
+        let docDropTarget = null;
+        let docDropPosition = null;
+        
+        // Store references to config input elements for click-to-focus from segment rows
+        let configInputElements = {};
+        
 
-          const rect = segmentsContentEl.getBoundingClientRect();
-          const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-          if (!inside) return;
+        
+        const updateDropIndicator = (clientY) => {
+          if (draggedIndex === null || !segmentsContentEl) return;
+          
+          const rowElements = Array.from(segmentsContentEl.querySelectorAll('[data-index]'));
+          if (rowElements.length === 0) return;
+          
+          // Get the bounds of the segments area
+          const firstRow = rowElements[0];
+          const lastRow = rowElements[rowElements.length - 1];
+          const firstRect = firstRow.getBoundingClientRect();
+          const lastRect = lastRow.getBoundingClientRect();
+          
+          let targetRow = null;
+          let position = null;
+          let insertIndex = null;
+          
+          // If cursor is above all rows, insert at top
+          if (clientY <= firstRect.top + firstRect.height / 2) {
+            targetRow = firstRow;
+            position = 'before';
+            insertIndex = 0;
+          }
+          // If cursor is below all rows, insert at bottom
+          else if (clientY >= lastRect.top + lastRect.height / 2) {
+            targetRow = lastRow;
+            position = 'after';
+            insertIndex = rowElements.length;
+          }
+          // Otherwise find the right position between rows
+          else {
+            for (let i = 0; i < rowElements.length; i++) {
+              const rowEl = rowElements[i];
+              const idx = parseInt(rowEl.dataset.index, 10);
+              if (Number.isNaN(idx)) continue;
+              
+              const rect = rowEl.getBoundingClientRect();
+              const midpoint = rect.top + rect.height / 2;
+              
+              if (clientY < midpoint) {
+                targetRow = rowEl;
+                position = 'before';
+                insertIndex = idx;
+                break;
+              }
+            }
+            
+            // Fallback to end if nothing matched
+            if (targetRow === null) {
+              targetRow = lastRow;
+              position = 'after';
+              insertIndex = rowElements.length;
+            }
+          }
+          
+          // Calculate final index after move
+          let finalIndex = insertIndex;
+          if (insertIndex > draggedIndex) {
+            finalIndex = insertIndex - 1;
+          }
+          
+          // Don't show indicator if it would result in same position
+          if (finalIndex === draggedIndex) {
+            targetRow = null;
+            position = null;
+          }
+          
+          // Only update if changed
+          if (targetRow !== docDropTarget || position !== docDropPosition) {
+            const theme = getTheme();
+            
+            // Clear previous indicator styling
+            if (docDropTarget) {
+              // Restore original box-shadow
+              const restoreShadow = docDropTarget.dataset.originalBoxShadow;
+              docDropTarget.style.boxShadow = (restoreShadow && restoreShadow !== 'none') ? restoreShadow : '';
+            }
+            
+            // Apply indicator using box-shadow (doesn't affect layout)
+            if (targetRow && position) {
+              // Store original box-shadow if not already stored
+              if (targetRow.dataset.originalBoxShadow === undefined) {
+                const currentShadow = targetRow.style.boxShadow;
+                // Store empty string if shadow is 'none' or empty
+                targetRow.dataset.originalBoxShadow = (currentShadow && currentShadow !== 'none') ? currentShadow : '';
+              }
+              
+              const originalShadow = targetRow.dataset.originalBoxShadow;
+              
+              // Use theme accent color for the indicator
+              const indicatorColor = theme.accent;
+              
+              // Build the shadow - indicator first, then original (if any)
+              const indicatorShadow = position === 'before'
+                ? `0 -4px 0 0 ${indicatorColor}, 0 -8px 16px 0 ${indicatorColor}`
+                : `0 4px 0 0 ${indicatorColor}, 0 8px 16px 0 ${indicatorColor}`;
+              
+              targetRow.style.boxShadow = originalShadow 
+                ? `${indicatorShadow}, ${originalShadow}`
+                : indicatorShadow;
+            }
+            
+            docDropTarget = targetRow;
+            docDropPosition = position;
+          }
+        };
+        
+        const clearDropIndicator = () => {
+          // Restore original box-shadow on the target row
+          if (docDropTarget) {
+            const restoreShadow = docDropTarget.dataset.originalBoxShadow;
+            docDropTarget.style.boxShadow = (restoreShadow && restoreShadow !== 'none') ? restoreShadow : '';
+          }
+          docDropTarget = null;
+          docDropPosition = null;
+        };
+
+        document.addEventListener('dragover', (e) => {
+          if (draggedIndex === null || !segmentsContentEl) return;
 
           if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
           e.preventDefault();
+          
+          // Update visual indicator based on Y position (works even outside container)
+          updateDropIndicator(e.clientY);
         }, true);
 
         document.addEventListener('drop', (e) => {
@@ -968,11 +1160,8 @@ app.registerExtension({
           // If the drop target is inside the list, row/container handlers will take care of it.
           if (e.target && segmentsContentEl.contains(e.target)) return;
 
-          const rect = segmentsContentEl.getBoundingClientRect();
-          const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-          if (!inside) return;
-
           e.preventDefault();
+          clearDropIndicator();
 
           const rowElements = Array.from(segmentsContentEl.querySelectorAll('[data-index]'));
           if (rowElements.length === 0) return;
@@ -990,17 +1179,23 @@ app.registerExtension({
             }
           }
 
+          // Check if move would result in same position
+          const finalIndex = insertIndex > draggedIndex ? insertIndex - 1 : insertIndex;
+          if (finalIndex === draggedIndex) return;
+
           const [movedItem] = segments.splice(draggedIndex, 1);
           if (insertIndex > draggedIndex) insertIndex -= 1;
           segments.splice(insertIndex, 0, movedItem);
 
-          console.log("[FlowPath] Segments reordered from index", draggedIndex, "to", insertIndex);
-          console.log("[FlowPath] New segment order:", segments.map(s => s.type).join(', '));
 
           activePresetName = null;
           updateWidgetData();
           renderUI();
           updateNodeSize();
+        }, true);
+        
+        document.addEventListener('dragend', (e) => {
+          clearDropIndicator();
         }, true);
 
         // Get current theme from global settings
@@ -1079,7 +1274,34 @@ app.registerExtension({
                 parts.push(config.content_rating || "SFW");
                 break;
               case "date":
-                parts.push("2026-01-30");
+                // Show actual current date based on date_format config
+                const dateFormat = config.date_format || "%Y-%m-%d";
+                const now = new Date();
+                const pad = (n) => n.toString().padStart(2, '0');
+                const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+                const daysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+                const weekNum = Math.floor(dayOfYear / 7);
+                
+                // Convert Python strftime to actual current date
+                let dateSample = dateFormat
+                  .replace(/%Y/g, now.getFullYear().toString())
+                  .replace(/%m/g, pad(now.getMonth() + 1))
+                  .replace(/%d/g, pad(now.getDate()))
+                  .replace(/%H/g, pad(now.getHours()))
+                  .replace(/%M/g, pad(now.getMinutes()))
+                  .replace(/%S/g, pad(now.getSeconds()))
+                  .replace(/%y/g, now.getFullYear().toString().slice(-2))
+                  .replace(/%B/g, months[now.getMonth()])
+                  .replace(/%b/g, monthsShort[now.getMonth()])
+                  .replace(/%A/g, days[now.getDay()])
+                  .replace(/%a/g, daysShort[now.getDay()])
+                  .replace(/%j/g, dayOfYear.toString().padStart(3, '0'))
+                  .replace(/%U/g, pad(weekNum))
+                  .replace(/%W/g, pad(weekNum));
+                parts.push(dateSample);
                 break;
               case "project":
                 if (config.project_name) parts.push(config.project_name);
@@ -1141,12 +1363,7 @@ app.registerExtension({
           if (node.setDirtyCanvas) {
             node.setDirtyCanvas(true, true);
           }
-          
-          console.log("[FlowPath] Widget data updated:", {
-            segments: segments.map(s => ({type: s.type, enabled: s.enabled})),
-            config: config
-          });
-        };
+         };
 
         // Function to update presets from external sync (called by other nodes)
         const updatePresetsFromSync = (newPresetName, presetData, deletedPresetName) => {
@@ -1154,12 +1371,10 @@ app.registerExtension({
             // Remove the preset from our local presets
             if (presets[deletedPresetName]) {
               delete presets[deletedPresetName];
-              console.log(`[FlowPath] Node ${node.id}: Removed synced preset "${deletedPresetName}"`);
             }
           } else if (newPresetName && presetData) {
             // Add/update the preset in our local presets
             presets[newPresetName] = JSON.parse(JSON.stringify(presetData));
-            console.log(`[FlowPath] Node ${node.id}: Added synced preset "${newPresetName}"`);
           }
           
           // Update widget data and re-render
@@ -1177,7 +1392,6 @@ app.registerExtension({
               n.comfyClass === "FlowPath" && n.id !== node.id
             );
             
-            console.log(`[FlowPath] Syncing presets to ${allFlowPathNodes.length} other FlowPath nodes`);
             
             let syncedCount = 0;
             allFlowPathNodes.forEach(otherNode => {
@@ -1187,7 +1401,6 @@ app.registerExtension({
                   const presetData = newPresetName ? presets[newPresetName] : null;
                   otherNode.flowPathSyncPreset(newPresetName, presetData, deletedPresetName);
                   syncedCount++;
-                  console.log(`[FlowPath] Synced preset to node ${otherNode.id} via flowPathSyncPreset`);
                 } else {
                   // Fallback: update widget_data directly (for older nodes that haven't refreshed)
                   const otherDataWidget = otherNode.widgets?.find(w => w.name === "widget_data");
@@ -1210,26 +1423,23 @@ app.registerExtension({
                     otherNode.genSortRender();
                   }
                   syncedCount++;
-                  console.log(`[FlowPath] Synced preset to node ${otherNode.id} via fallback`);
                 }
               } catch (e) {
                 console.warn(`[FlowPath] Failed to sync preset to node ${otherNode.id}:`, e);
               }
             });
             
+            // Log sync count but don't show separate toast (main action toast is sufficient)
             if (syncedCount > 0) {
-              if (newPresetName) {
-                showToast(`Preset synced to ${syncedCount} other FlowPath node(s)`, "info", 2000);
-              } else if (deletedPresetName) {
-                showToast(`Preset removed from ${syncedCount} other FlowPath node(s)`, "info", 2000);
-              }
             }
           } catch (error) {
             console.error("[FlowPath] Error syncing presets:", error);
           }
         };
 
-        const showInputDialog = (title, defaultValue = "", placeholder = "") => {
+        const showInputDialog = (title, defaultValue = "", placeholder = "", options = {}) => {
+          const { maxLength = 0, warningMessage = "" } = options;
+          
           return new Promise((resolve) => {
             const overlay = document.createElement("div");
             overlay.style.cssText = `
@@ -1255,7 +1465,12 @@ app.registerExtension({
               padding: 24px;
               min-width: 320px;
               box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+              transition: border-color 0.15s, box-shadow 0.15s;
             `;
+            
+            // Store original border for reset
+            const originalBorder = `2px solid ${theme.primary}`;
+            const originalShadow = '0 8px 32px rgba(0, 0, 0, 0.6)';
 
             const titleEl = document.createElement("div");
             titleEl.textContent = title;
@@ -1266,11 +1481,31 @@ app.registerExtension({
               margin-bottom: 16px;
             `;
             dialog.appendChild(titleEl);
+            
+            // Warning message area (for empty fields, etc.)
+            const warningEl = document.createElement("div");
+            warningEl.style.cssText = `
+              display: ${warningMessage ? 'block' : 'none'};
+              padding: 10px 12px;
+              margin-bottom: 12px;
+              background: rgba(234, 179, 8, 0.15);
+              border: 1px solid rgba(234, 179, 8, 0.5);
+              border-left: 3px solid rgba(234, 179, 8, 0.8);
+              border-radius: 6px;
+              color: rgba(253, 224, 71, 0.95);
+              font-size: 12px;
+              line-height: 1.4;
+            `;
+            warningEl.innerHTML = warningMessage ? `⚠️ ${warningMessage}` : '';
+            dialog.appendChild(warningEl);
 
             const input = document.createElement("input");
             input.type = "text";
             input.value = defaultValue;
             input.placeholder = placeholder;
+            if (maxLength > 0) {
+              input.maxLength = maxLength;
+            }
             input.style.cssText = `
               width: 100%;
               padding: 10px;
@@ -1279,7 +1514,7 @@ app.registerExtension({
               border-radius: 6px;
               color: #fff;
               font-size: 14px;
-              margin-bottom: 16px;
+              margin-bottom: 8px;
               box-sizing: border-box;
               transition: all 0.3s;
             `;
@@ -1292,6 +1527,93 @@ app.registerExtension({
               input.style.boxShadow = 'none';
             };
             dialog.appendChild(input);
+            
+            // Character count and limit warning
+            const inputInfoRow = document.createElement("div");
+            inputInfoRow.style.cssText = `
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 16px;
+              min-height: 20px;
+            `;
+            
+            const limitWarning = document.createElement("div");
+            limitWarning.style.cssText = `
+              color: rgba(239, 68, 68, 0.9);
+              font-size: 11px;
+              font-weight: 500;
+              opacity: 0;
+              transition: opacity 0.2s;
+            `;
+            limitWarning.textContent = `Maximum ${maxLength} characters`;
+            inputInfoRow.appendChild(limitWarning);
+            
+            const charCount = document.createElement("div");
+            charCount.style.cssText = `
+              color: rgba(255, 255, 255, 0.5);
+              font-size: 11px;
+              margin-left: auto;
+            `;
+            if (maxLength > 0) {
+              charCount.textContent = `${input.value.length}/${maxLength}`;
+            }
+            inputInfoRow.appendChild(charCount);
+            
+            dialog.appendChild(inputInfoRow);
+            
+            // Shake animation function
+            const shakeDialog = () => {
+              dialog.style.animation = 'none';
+              dialog.offsetHeight; // Trigger reflow
+              dialog.style.animation = 'dialogShake 0.4s ease-in-out';
+            };
+            
+            // Flash red function
+            const flashRed = () => {
+              dialog.style.border = '2px solid rgba(239, 68, 68, 0.9)';
+              dialog.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(239, 68, 68, 0.4)';
+              limitWarning.style.opacity = '1';
+              
+              setTimeout(() => {
+                dialog.style.border = originalBorder;
+                dialog.style.boxShadow = originalShadow;
+              }, 300);
+            };
+            
+            // Add shake keyframes if not already present
+            if (!document.querySelector('#flowpath-dialog-animations')) {
+              const style = document.createElement('style');
+              style.id = 'flowpath-dialog-animations';
+              style.textContent = `
+                @keyframes dialogShake {
+                  0%, 100% { transform: translateX(0); }
+                  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+                  20%, 40%, 60%, 80% { transform: translateX(6px); }
+                }
+              `;
+              document.head.appendChild(style);
+            }
+            
+            // Input handler for character limit
+            input.oninput = () => {
+              if (maxLength > 0) {
+                charCount.textContent = `${input.value.length}/${maxLength}`;
+                
+                // Check if at limit
+                if (input.value.length >= maxLength) {
+                  charCount.style.color = 'rgba(239, 68, 68, 0.9)';
+                  flashRed();
+                  shakeDialog();
+                } else if (input.value.length >= maxLength * 0.8) {
+                  charCount.style.color = 'rgba(234, 179, 8, 0.9)';
+                  limitWarning.style.opacity = '0';
+                } else {
+                  charCount.style.color = 'rgba(255, 255, 255, 0.5)';
+                  limitWarning.style.opacity = '0';
+                }
+              }
+            };
 
             const btnContainer = document.createElement("div");
             btnContainer.style.cssText = `
@@ -1560,9 +1882,9 @@ app.registerExtension({
           content.style.cssText = `
             margin-top: 8px;
             padding: 10px;
-            background: rgba(0, 0, 0, 0.2);
+            background: ${theme.background};
             border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid ${theme.primaryLight};
             display: ${isExpanded ? 'block' : 'none'};
           `;
 
@@ -1579,7 +1901,15 @@ app.registerExtension({
         const renderUI = () => {
           const theme = getTheme();
           
+          // Clear config input references (will be repopulated during render)
+          configInputElements = {};
+          
+          // Reset drop indicator state
+          docDropTarget = null;
+          docDropPosition = null;
+          
           container.style.cssText = `
+            position: relative;
             background: ${theme.background || 'linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.2))'};
             border: 1px solid ${theme.primaryLight};
             border-radius: 8px;
@@ -1591,59 +1921,690 @@ app.registerExtension({
           `;
           
           container.innerHTML = "";
+          
+          // Helper to convert hex color to rgba
+          const hexToRgba = (hex, alpha = 1) => {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+          };
+          
+          // Helper to show full container loading animation (like opening folder)
+          const showContainerLoadingAnimation = (message) => {
+            // Add keyframes if not already added
+            if (!document.getElementById('flowpath-diagonal-keyframes')) {
+              const style = document.createElement('style');
+              style.id = 'flowpath-diagonal-keyframes';
+              style.textContent = `
+                @keyframes flowpathStripeMove {
+                  from { transform: translateX(-28px); }
+                  to { transform: translateX(0); }
+                }
+              `;
+              document.head.appendChild(style);
+            }
+            
+            // Remove existing overlay if any
+            const existingOverlay = container.querySelector('.container-loading-overlay');
+            if (existingOverlay) existingOverlay.remove();
+            
+            const overlay = document.createElement('div');
+             overlay.className = 'container-loading-overlay';
+             overlay.style.cssText = `
+               position: absolute;
+               top: 0;
+               left: 0;
+               right: 0;
+               bottom: 0;
+               background: rgba(34, 197, 94, 0.95);
+               border-radius: 8px;
+               display: flex;
+               align-items: center;
+               justify-content: center;
+               z-index: 100;
+               opacity: 1;
+               transition: opacity 0.5s ease-out;
+               pointer-events: none;
+               overflow: hidden;
+             `;
+            
+            // Add diagonal stripes animation
+            const stripes = document.createElement('div');
+            stripes.style.cssText = `
+              position: absolute;
+              top: 0;
+              left: -28px;
+              right: -28px;
+              bottom: 0;
+              background: repeating-linear-gradient(
+                -45deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 7px,
+                transparent 7px,
+                transparent 14px
+              );
+              animation: flowpathStripeMove 0.5s linear infinite;
+              pointer-events: none;
+            `;
+            overlay.appendChild(stripes);
+            
+            const text = document.createElement('span');
+            text.textContent = message;
+            text.style.cssText = `
+              color: #fff;
+              font-size: 14px;
+              font-weight: 600;
+              text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+              position: relative;
+              z-index: 1;
+            `;
+            overlay.appendChild(text);
+            
+            container.appendChild(overlay);
+             
+             // Fade out and remove - show for 1.5s then fade over 0.5s
+             setTimeout(() => {
+               overlay.style.opacity = '0';
+               setTimeout(() => overlay.remove(), 500);
+             }, 1500);
+           };
+          
+          // Helper function to build preview HTML
+          const buildPreviewHtml = () => {
+            const previewPath = buildPreviewPath();
+            const isImageSaverMode = config.output_mode === 'imageSaver';
+            const hasFilenameTemplate = config.filename_template && config.filename_template.trim();
+            let filenamePreviewStr = "";
+            if (hasFilenameTemplate) {
+              filenamePreviewStr = replaceTemplateVars(config.filename_template, true);
+            }
+            
+            // Split path into segments for breadcrumb display, always start with "output/"
+             // When empty: SI mode shows "ComfyUI" (filename prefix), IS mode shows just "output"
+             const emptyDefault = isImageSaverMode ? ['output'] : ['output', 'ComfyUI'];
+             const pathParts = previewPath ? ['output', ...previewPath.split(' / ')] : emptyDefault;
+            const breadcrumbHtml = pathParts.map((part, i) => {
+                const isLast = i === pathParts.length - 1;
+                return `<span style="color: #fff; font-weight: ${isLast ? '600' : '400'};">${part}</span>`;
+              }).join(`<span style="color: ${theme.accent}; opacity: 0.7;">/</span>`);
+            
+            let html = "";
+            
+            // Header row with icon and mode toggle
+            const saveImageActive = !isImageSaverMode;
+            const imageSaverActive = isImageSaverMode;
+            
+            // Build the copyable path (output/ + path segments)
+             // When empty: SI mode shows "ComfyUI" (filename prefix), IS mode shows just "output"
+             const emptyPathDefault = isImageSaverMode ? 'output' : 'output/ComfyUI';
+             const copyablePath = previewPath ? `output/${previewPath.replace(/ \/ /g, '/')}` : emptyPathDefault;
+            
+            html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+              ${globalSettings.showEmojis ? '<span style="font-size: 16px;">📁</span>' : ''}
+              <span style="color: ${theme.accent}; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Output Preview</span>
+              <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+                <span class="mode-info-icon" style="
+                  display: inline-flex;
+                  align-items: center;
+                  justify-content: center;
+                  width: 16px;
+                  height: 16px;
+                  border-radius: 50%;
+                  background: rgba(255,255,255,0.1);
+                  border: 1px solid rgba(255,255,255,0.2);
+                  color: rgba(255,255,255,0.5);
+                  font-size: 10px;
+                  font-weight: bold;
+                  font-style: italic;
+                  font-family: Georgia, serif;
+                  cursor: help;
+                  transition: all 0.2s;
+                " title="Output Modes:&#10;&#10;• SI (Save Image): Default mode, works with most workflows. The path becomes a filename prefix with auto-numbering.&#10;&#10;• IS (Image Saver): For the Image Saver node which supports separate folder paths and filenames with variables.&#10;&#10;Use SI unless your workflow specifically uses the Image Saver node.">i</span>
+                <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); border-radius: 4px; padding: 2px; border: 1px solid rgba(255,255,255,0.1);">
+                  <button class="mode-btn-save" style="
+                     padding: 3px 6px;
+                     font-size: 10px;
+                     font-weight: 600;
+                     border: none;
+                     border-radius: 3px;
+                     cursor: pointer;
+                     transition: all 0.2s;
+                     background: ${saveImageActive ? (theme.accent || '#d97706') : 'rgba(0,0,0,0.2)'};
+                     color: ${saveImageActive ? '#000' : 'rgba(255,255,255,0.6)'};
+                   " title="Save Image mode: Path acts as filename prefix">SI</button>
+                   <button class="mode-btn-saver" style="
+                     padding: 3px 6px;
+                     font-size: 10px;
+                     font-weight: 600;
+                     border: none;
+                     border-radius: 3px;
+                     cursor: pointer;
+                     transition: all 0.2s;
+                     background: ${imageSaverActive ? (theme.accent || '#d97706') : 'rgba(0,0,0,0.2)'};
+                     color: ${imageSaverActive ? '#000' : 'rgba(255,255,255,0.6)'};
+                   " title="Image Saver mode: Separate path and filename">IS</button>
+                </div>
+              </div>
+            </div>`;
+            
+            if (isImageSaverMode) {
+              // Image Saver mode: Show path and filename merged
+              const filenameDisplay = hasFilenameTemplate 
+                ? `<span style="color: #fff; font-weight: 600;">${filenamePreviewStr || config.filename_template}</span><span style="color: rgba(255,255,255,0.3);">_##.[ext]</span>`
+                : `<span style="color: rgba(255,255,255,0.4); font-style: italic;">&lt;filename&gt;</span><span style="color: rgba(255,255,255,0.3);">_##.[ext]</span>`;
+              
+              html += `<div class="path-string-container" style="
+                padding: 10px 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 6px;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                cursor: pointer;
+                position: relative;
+                transition: background 0.2s;
+              ">
+                <div style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 12px; line-height: 1.8; display: flex; flex-wrap: wrap; align-items: center;">
+                  ${breadcrumbHtml}<span style="color: ${theme.accent}; margin: 0 2px; opacity: 0.7;">/</span>${filenameDisplay}
+                </div>
+              </div>`;
+              
+              if (!hasFilenameTemplate) {
+                html += `<div style="
+                  margin-top: 8px;
+                  padding: 6px 10px;
+                  background: ${hexToRgba(theme.accent, 0.1)};
+                  border-radius: 4px;
+                  border-left: 2px solid ${theme.accent};
+                ">
+                  <span style="color: rgba(255,255,255,0.6); font-size: 10px;">💡 Expand the <strong>Filename</strong> section below to set your filename pattern.</span>
+                </div>`;
+              }
+            } else {
+              // Save Image mode: Path acts as filename prefix
+              html += `<div class="path-string-container" style="
+                padding: 10px 12px;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 6px;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                cursor: pointer;
+                position: relative;
+                transition: background 0.2s;
+              ">
+                <div style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 12px; line-height: 1.8; display: flex; flex-wrap: wrap; align-items: center;">
+                  ${breadcrumbHtml}<span style="color: rgba(255,255,255,0.3);">_#####.[ext]</span>
+                </div>
+              </div>`;
+            }
+            
+            return html;
+          };
 
-          // PATH & FILENAME PREVIEW
+          // PATH & FILENAME PREVIEW - Clean, modern design (optionally sticky at top)
           const preview = document.createElement("div");
+          const isSticky = globalSettings.stickyPreview;
           preview.style.cssText = `
+            ${isSticky ? 'position: sticky; top: 0; z-index: 10;' : ''}
             margin-bottom: 12px;
-            padding: 12px 14px;
-            background: ${theme.gradient};
-            border-radius: 8px;
-            border-left: 4px solid ${theme.primary};
-            color: ${theme.accent};
-            font-size: 12px;
-            word-break: break-all;
-            font-family: 'Consolas', 'Monaco', monospace;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            background-color: ${isSticky ? '#0a0a0c' : 'transparent'};
+            background-image: ${theme.background};
+            border-radius: 6px;
+            border: 1px solid ${theme.primaryLight};
+            box-shadow: ${isSticky ? '0 4px 12px rgba(0, 0, 0, 0.3)' : 'none'};
           `;
-          const previewPath = buildPreviewPath();
-          console.log("[FlowPath] Building preview with segments:", segments.map(s => `${s.type}${s.enabled === false ? '(disabled)' : ''}`).join(', '));
-          console.log("[FlowPath] Preview path:", previewPath);
           
-          // Build filename preview - check raw template, not processed value
-          const hasFilenameTemplate = config.filename_template && config.filename_template.trim();
-          let filenamePreviewStr = "";
-          if (hasFilenameTemplate) {
-            filenamePreviewStr = replaceTemplateVars(config.filename_template, true);
-          }
           
-          let previewHtml = "";
+          // Helper to attach mode button listeners
+          const attachModeButtonListeners = () => {
+            const saveBtn = preview.querySelector('.mode-btn-save');
+            const saverBtn = preview.querySelector('.mode-btn-saver');
+            
+            if (saveBtn) {
+              saveBtn.onclick = () => {
+                if (config.output_mode !== 'saveImage') {
+                  config.output_mode = 'saveImage';
+                  updateWidgetData();
+                  renderUI();
+                  updateNodeSize();
+                }
+              };
+              saveBtn.onmouseenter = () => {
+                 if (config.output_mode !== 'saveImage') {
+                   saveBtn.style.background = 'rgba(255,255,255,0.15)';
+                 } else {
+                   // Keep active state background on hover
+                   saveBtn.style.background = theme.accent || '#d97706';
+                 }
+               };
+               saveBtn.onmouseleave = () => {
+                 if (config.output_mode !== 'saveImage') {
+                   saveBtn.style.background = 'rgba(0,0,0,0.2)';
+                 } else {
+                   // Maintain active state background
+                   saveBtn.style.background = theme.accent || '#d97706';
+                 }
+               };
+            }
+            
+            if (saverBtn) {
+              saverBtn.onclick = () => {
+                if (config.output_mode !== 'imageSaver') {
+                  config.output_mode = 'imageSaver';
+                  // Auto-expand filename section when switching to Image Saver mode
+                  if (!filenameExpanded) {
+                    filenameExpanded = true;
+                  }
+                  updateWidgetData();
+                  renderUI();
+                  updateNodeSize();
+                }
+              };
+              saverBtn.onmouseenter = () => {
+                 if (config.output_mode !== 'imageSaver') {
+                   saverBtn.style.background = 'rgba(255,255,255,0.15)';
+                 } else {
+                   // Keep active state background on hover
+                   saverBtn.style.background = theme.accent || '#d97706';
+                 }
+               };
+               saverBtn.onmouseleave = () => {
+                 if (config.output_mode !== 'imageSaver') {
+                   saverBtn.style.background = 'rgba(0,0,0,0.2)';
+                 } else {
+                   // Maintain active state background
+                   saverBtn.style.background = theme.accent || '#d97706';
+                 }
+               };
+            }
+          };
           
-          if (hasFilenameTemplate) {
-            // Filename template is set - path is folders only (show trailing / to indicate folder)
-            previewHtml = `<strong style="color: ${theme.accent};">📁 path:</strong> <span style="color: #fff; font-weight: 500;">${previewPath || "(empty)"} /</span>`;
-            previewHtml += `<br><strong style="color: ${theme.accent};">📝 filename:</strong> <span style="color: #fff; font-weight: 500;">${filenamePreviewStr || config.filename_template}_##.[ext]</span>`;
-            previewHtml += `<br><span style="color: rgba(255,255,255,0.4); font-size: 10px; margin-top: 4px; display: block;">Image Saver result: ${previewPath} / ${filenamePreviewStr || config.filename_template}_##.[ext]</span>`;
-          } else {
-            // No filename - path acts as filename prefix for Save Image
-            previewHtml = `<strong style="color: ${theme.accent};">📁 path:</strong> <span style="color: #fff; font-weight: 500;">${previewPath || "(empty)"}_#####.[ext]</span>`;
-            previewHtml += `<br><span style="color: rgba(255,255,255,0.4); font-size: 10px;">For Image Saver: expand 📝 Filename section below</span>`;
-          }
+          // Helper to get current copyable path
+            const getCurrentCopyablePath = () => {
+              const currentPreviewPath = buildPreviewPath();
+              // When empty: SI mode shows "ComfyUI" (filename prefix), IS mode shows just "output"
+              const isIS = config.output_mode === 'imageSaver';
+              const emptyDefault = isIS ? 'output' : 'output/ComfyUI';
+              return currentPreviewPath ? `output/${currentPreviewPath.replace(/ \/ /g, '/')}` : emptyDefault;
+            };
           
-          preview.innerHTML = previewHtml;
+          // Helper to show flash overlay on the path string container
+          const showPathFlash = (message, color, textColor = '#fff', animated = false) => {
+            const pathContainer = preview.querySelector('.path-string-container');
+            if (!pathContainer) return;
+            
+            // Remove existing overlay if any
+            const existingOverlay = pathContainer.querySelector('.path-flash-overlay');
+            if (existingOverlay) existingOverlay.remove();
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'path-flash-overlay';
+            overlay.style.cssText = `
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: ${color};
+              border-radius: 6px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              z-index: 100;
+              opacity: 1;
+              transition: opacity 0.4s ease-out;
+              pointer-events: none;
+              overflow: hidden;
+            `;
+            
+            // Add construction-style warning diagonal stripes animation
+            if (animated) {
+              // Add keyframes if not already added
+              if (!document.getElementById('flowpath-diagonal-keyframes')) {
+                const style = document.createElement('style');
+                style.id = 'flowpath-diagonal-keyframes';
+                style.textContent = `
+                  @keyframes flowpathStripeMove {
+                    from { transform: translateX(-28px); }
+                    to { transform: translateX(0); }
+                  }
+                `;
+                document.head.appendChild(style);
+              }
+              
+              const stripes = document.createElement('div');
+              stripes.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: -28px;
+                right: -28px;
+                bottom: 0;
+                background: repeating-linear-gradient(
+                  -45deg,
+                  rgba(0, 0, 0, 0.15),
+                  rgba(0, 0, 0, 0.15) 7px,
+                  transparent 7px,
+                  transparent 14px
+                );
+                animation: flowpathStripeMove 0.5s linear infinite;
+                pointer-events: none;
+              `;
+              overlay.appendChild(stripes);
+            }
+            
+            const text = document.createElement('span');
+            text.textContent = message;
+            text.style.cssText = `
+              color: ${textColor};
+              font-size: 12px;
+              font-weight: 600;
+              text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+              position: relative;
+              z-index: 1;
+            `;
+            overlay.appendChild(text);
+            
+            pathContainer.appendChild(overlay);
+            
+            // Fade out and remove
+            setTimeout(() => {
+              overlay.style.opacity = '0';
+              setTimeout(() => overlay.remove(), 400);
+            }, 1000);
+          };
+          
+          // Container for action prompts (shown below preview)
+          let actionPromptBox = null;
+          
+          // Helper to show action prompt below preview
+          const showActionPrompt = (message, actions) => {
+            // Remove existing prompt
+            if (actionPromptBox) {
+              actionPromptBox.remove();
+              actionPromptBox = null;
+            }
+            
+            actionPromptBox = document.createElement('div');
+            actionPromptBox.style.cssText = `
+              margin-top: -8px;
+              margin-bottom: 12px;
+              padding: 10px 12px;
+              background: ${hexToRgba(theme.accent, 0.15)};
+              border: 1px solid ${hexToRgba(theme.accent, 0.4)};
+              border-radius: 6px;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+            `;
+            
+            const msgSpan = document.createElement('span');
+            msgSpan.textContent = message;
+            msgSpan.style.cssText = `
+              color: rgba(255, 255, 255, 0.9);
+              font-size: 11px;
+              flex: 1;
+            `;
+            actionPromptBox.appendChild(msgSpan);
+            
+            const btnContainer = document.createElement('div');
+            btnContainer.style.cssText = `display: flex; gap: 6px;`;
+            
+            actions.forEach(action => {
+              const btn = document.createElement('button');
+              btn.textContent = action.label;
+              btn.style.cssText = `
+                padding: 5px 10px;
+                font-size: 11px;
+                font-weight: 600;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: all 0.2s;
+                background: ${action.primary ? hexToRgba(theme.accent, 0.8) : 'rgba(255,255,255,0.1)'};
+                color: ${action.primary ? '#000' : 'rgba(255,255,255,0.8)'};
+              `;
+              btn.onmouseenter = () => {
+                btn.style.transform = 'scale(1.05)';
+                btn.style.filter = 'brightness(1.1)';
+              };
+              btn.onmouseleave = () => {
+                btn.style.transform = 'scale(1)';
+                btn.style.filter = 'brightness(1)';
+              };
+              btn.onclick = () => {
+                action.onClick();
+                if (actionPromptBox) {
+                  actionPromptBox.remove();
+                  actionPromptBox = null;
+                }
+              };
+              btnContainer.appendChild(btn);
+            });
+            
+            actionPromptBox.appendChild(btnContainer);
+            
+            // Insert after preview
+            preview.parentNode.insertBefore(actionPromptBox, preview.nextSibling);
+          };
+          
+          // Helper to hide action prompt
+          const hideActionPrompt = () => {
+            if (actionPromptBox) {
+              actionPromptBox.remove();
+              actionPromptBox = null;
+            }
+          };
+          
+          // Attach click handler to path container after preview is built
+          const attachPathClickHandler = () => {
+            const pathContainer = preview.querySelector('.path-string-container');
+            if (!pathContainer) return;
+            
+            // Update tooltip based on mode and seed segment
+             const currentPath = getCurrentCopyablePath();
+             const hasSeedSegment = currentPath.includes('[seed-auto]');
+             const enabledSegs = segments.filter(s => s.enabled);
+             const seedIsLast = enabledSegs.length > 0 && enabledSegs[enabledSegs.length - 1].type === 'seed';
+             const isSIMode = config.output_mode !== 'imageSaver';
+             
+             let folderTooltip = 'Click to copy path • Shift+click to open folder';
+             if (isSIMode && enabledSegs.length > 0) {
+               folderTooltip = 'Click to copy path • Shift+click to open folder (last segment is filename prefix)';
+             }
+             if (hasSeedSegment) {
+               const seedCanBeSkipped = isSIMode 
+                 ? (enabledSegs.length > 1 && enabledSegs[enabledSegs.length - 2]?.type === 'seed')
+                 : seedIsLast;
+               folderTooltip = seedCanBeSkipped
+                 ? 'Click to copy path • Shift+click to open parent folder (seed excluded)'
+                 : 'Click to copy path • Shift+click disabled (seed in middle of path)';
+             }
+             pathContainer.title = folderTooltip;
+            pathContainer.style.userSelect = 'none';
+            pathContainer.style.webkitUserSelect = 'none';
+            
+            pathContainer.onmouseenter = () => {
+              pathContainer.style.background = 'rgba(255, 255, 255, 0.08)';
+            };
+            pathContainer.onmouseleave = () => {
+              pathContainer.style.background = 'rgba(0, 0, 0, 0.3)';
+            };
+            
+            pathContainer.onclick = async (e) => {
+               const pathToCopy = getCurrentCopyablePath();
+               
+               if (e.shiftKey) {
+                 // Shift+click: Try to open the folder
+                 let folderPath = pathToCopy;
+                 
+                 // In SI (Save Image) mode, the last segment is the filename prefix, not a folder
+                 // We need to open the parent folder where images are actually saved
+                 const isImageSaverMode = config.output_mode === 'imageSaver';
+                 if (!isImageSaverMode && folderPath.includes('/')) {
+                   // SI mode: strip the last component (filename prefix) to get actual folder
+                   folderPath = folderPath.substring(0, folderPath.lastIndexOf('/'));
+                   if (!folderPath || folderPath === 'output') {
+                     folderPath = 'output';
+                   }
+                 }
+                 
+                 // Check if path contains seed (only known at generation time)
+                 if (folderPath.includes('[seed-auto]')) {
+                   // Check if seed is the last enabled segment - if so, we can open the parent folder
+                   const enabledSegments = segments.filter(s => s.enabled);
+                   const lastEnabledSegment = enabledSegments[enabledSegments.length - 1];
+                   
+                   // In SI mode we already stripped one level, so check second-to-last for seed
+                   const segmentToCheck = isImageSaverMode ? lastEnabledSegment : enabledSegments[enabledSegments.length - 2];
+                   
+                   if (segmentToCheck && segmentToCheck.type === 'seed') {
+                     // Seed is at the folder level we're trying to open - strip it too
+                     folderPath = folderPath.replace(/\/?\[seed-auto\]$/, '');
+                     if (!folderPath || folderPath === 'output/') {
+                       folderPath = 'output';
+                     }
+                   } else if (folderPath.includes('[seed-auto]')) {
+                     // Seed is in the middle of path - can't determine folder
+                     showPathFlash('Cannot open: seed is in middle of path', 'rgba(245, 158, 11, 0.95)', '#000');
+                     return;
+                   }
+                 }
+                 
+                  try {
+                    // Blur the window first to allow Explorer to take focus
+                    // (Windows blocks focus-stealing when the requesting app has focus)
+                    window.blur();
+                    
+                    const response = await fetch('/flowpath/open_folder', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ path: folderPath })
+                    });
+                   
+                   const result = await response.json();
+                   
+                   if (result.error === 'not_found') {
+                     // Show yellow flash with "not found" message
+                     showPathFlash('Folder not found', hexToRgba(theme.accent, 0.95), '#000');
+                     
+                     // Show action prompt below preview
+                     showActionPrompt(`Create "${folderPath}" and open it?`, [
+                       { label: 'Cancel', primary: false, onClick: hideActionPrompt },
+                       { 
+                         label: 'Create & Open', 
+                         primary: true, 
+                          onClick: async () => {
+                            try {
+                              // Blur window to allow Explorer to take focus
+                              window.blur();
+                              
+                              const createResponse = await fetch('/flowpath/create_and_open_folder', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: folderPath })
+                              });
+                             const createResult = await createResponse.json();
+                             if (createResult.success) {
+                               showPathFlash('Folder created and opening folder...', 'rgba(34, 197, 94, 0.95)', '#fff', true);
+                             } else if (createResult.error) {
+                               showPathFlash('Failed: ' + createResult.error, 'rgba(239, 68, 68, 0.95)');
+                             }
+                           } catch (err) {
+                             console.error('[FlowPath] Failed to create folder:', err);
+                             showPathFlash('Failed to create folder', 'rgba(239, 68, 68, 0.95)');
+                           }
+                         }
+                       }
+                     ]);
+                  } else if (result.success) {
+                    // Show themed flash with animated diagonal lines
+                    showPathFlash('Opening folder...', 'rgba(34, 197, 94, 0.95)', '#fff', true);
+                  } else if (result.error) {
+                    showPathFlash('Error: ' + result.error, 'rgba(239, 68, 68, 0.95)');
+                  }
+                } catch (err) {
+                  console.error('[FlowPath] Failed to open folder:', err);
+                  showPathFlash('Backend not available', 'rgba(239, 68, 68, 0.95)');
+                }
+              } else {
+                // Regular click: Copy to clipboard
+                try {
+                  await navigator.clipboard.writeText(pathToCopy);
+                  showPathFlash('Copied to clipboard', 'rgba(34, 197, 94, 0.95)');
+                } catch (err) {
+                  console.error('[FlowPath] Failed to copy path:', err);
+                  showPathFlash('Failed to copy', 'rgba(239, 68, 68, 0.95)');
+                }
+              }
+            };
+          };
+          
+          // Helper to update preview and reattach listeners
+          const updatePreview = () => {
+            preview.innerHTML = buildPreviewHtml();
+            attachModeButtonListeners();
+            attachPathClickHandler();
+          };
+          
+          updatePreview();
           container.appendChild(preview);
 
           // PATH SEGMENTS SECTION
-          const segmentsSection = createSection("📋 Path Segments", segmentsExpanded, () => {
+          const segmentsSection = createSection(`${emojiWithSpace('📋')}Path Segments`, segmentsExpanded, () => {
             segmentsExpanded = !segmentsExpanded;
             renderUI();
             updateNodeSize();
           });
           container.appendChild(segmentsSection.section);
+          
+          // Add red warning overlay to segments header (for animated transitions)
+          segmentsSection.header.style.position = 'relative';
+          segmentsSection.header.style.overflow = 'hidden';
+          
+          const segmentsWarningOverlay = document.createElement("div");
+          segmentsWarningOverlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, rgba(153, 27, 27, 0.8) 0%, rgba(220, 38, 38, 0.7) 50%, rgba(239, 68, 68, 0.8) 100%);
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            pointer-events: none;
+            border-radius: 5px;
+            z-index: 0;
+          `;
+          segmentsSection.header.insertBefore(segmentsWarningOverlay, segmentsSection.header.firstChild);
+          
+          // Make sure header content is above the overlay
+          Array.from(segmentsSection.header.children).forEach(child => {
+            if (child !== segmentsWarningOverlay) {
+              child.style.position = 'relative';
+              child.style.zIndex = '1';
+            }
+          });
+          
+          // Add warning text element inside segments header
+          const segmentsWarningText = document.createElement("span");
+          segmentsWarningText.style.cssText = `
+            display: none;
+            margin-left: auto;
+            padding: 2px 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 10px;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+          `;
+          segmentsSection.header.appendChild(segmentsWarningText);
 
           if (segmentsExpanded) {
             segmentsContentEl = segmentsSection.content;
 
+            // Simple handlers - document-level handles visual feedback
             const onSegmentsDragEnter = (e) => {
               if (draggedIndex === null) return;
               e.preventDefault();
@@ -1655,12 +2616,14 @@ app.registerExtension({
               e.preventDefault();
               e.stopPropagation();
               e.dataTransfer.dropEffect = 'move';
+              // Visual feedback handled by document-level dragover
             };
 
             const onSegmentsDrop = (e) => {
               if (draggedIndex === null) return;
               e.preventDefault();
               e.stopPropagation();
+              clearDropIndicator();
 
               const rowElements = Array.from(segmentsSection.content.querySelectorAll('[data-index]'));
               if (rowElements.length === 0) return;
@@ -1679,12 +2642,14 @@ app.registerExtension({
                 }
               }
 
+              // Check if move would result in same position
+              const finalIndex = insertIndex > draggedIndex ? insertIndex - 1 : insertIndex;
+              if (finalIndex === draggedIndex) return;
+
               const [movedItem] = segments.splice(draggedIndex, 1);
               if (insertIndex > draggedIndex) insertIndex -= 1;
               segments.splice(insertIndex, 0, movedItem);
 
-              console.log("[FlowPath] Segments reordered from index", draggedIndex, "to", insertIndex);
-              console.log("[FlowPath] New segment order:", segments.map(s => s.type).join(', '));
 
               activePresetName = null;
               updateWidgetData();
@@ -1700,23 +2665,66 @@ app.registerExtension({
             segments.forEach((segment, index) => {
               const segInfo = SEGMENT_TYPES[segment.type] || { icon: "❓", label: segment.type };
               
+              // Check if this segment's config value is empty (for enabled segments with config)
+              const configKey = segInfo.configKey;
+              // For custom segments, the config key is dynamically generated
+              const effectiveConfigKey = segment.type === 'custom' ? `custom_segment_${index}` : configKey;
+              
+              let isConfigEmpty = false;
+              if (segment.enabled && segment.type !== 'seed') {
+                // seed is auto-detected - don't mark as empty
+                if (segment.type === 'custom') {
+                  // For custom segments, check the segment.value
+                  isConfigEmpty = !segment.value || !segment.value.trim();
+                } else if (configKey) {
+                  // For other segments, check the config value
+                  const configValue = config[configKey];
+                  isConfigEmpty = !configValue || (typeof configValue === 'string' && !configValue.trim());
+                }
+              }
+              
               const row = document.createElement("div");
               row.draggable = true;
               row.dataset.index = index;
+              row.dataset.configKey = effectiveConfigKey || ''; // Store config key for click handler
               row.title = segInfo.tooltip || ""; // Add tooltip
+              
+              // Base styling with red highlight if config is empty
+              const baseBackground = segment.enabled ? theme.gradient : 'rgba(255, 255, 255, 0.03)';
+              const emptyBackground = 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08))';
+              const baseBorder = segment.enabled ? theme.primaryLight : 'rgba(255, 255, 255, 0.05)';
+              const emptyBorder = 'rgba(239, 68, 68, 0.5)';
+              
+              // Start with base styling, then animate to red if empty
               row.style.cssText = `
                 display: flex;
                 align-items: center;
                 padding: 8px;
                 margin: 3px 0;
-                background: ${segment.enabled ? theme.gradient : 'rgba(255, 255, 255, 0.03)'};
+                background: ${baseBackground};
                 border-radius: 6px;
-                cursor: move;
-                transition: all 0.2s;
-                border-left: 3px solid ${segment.enabled ? theme.primary : 'transparent'};
-                border: 1px solid ${segment.enabled ? theme.primaryLight : 'rgba(255, 255, 255, 0.05)'};
+                cursor: ${segment.enabled ? 'pointer' : 'move'};
+                transition: background 0.4s ease-in-out, border-color 0.4s ease-in-out, box-shadow 0.4s ease-in-out;
+                border: 1px solid ${baseBorder};
                 position: relative;
               `;
+              
+              // Store reference for delayed red animation
+              if (isConfigEmpty) {
+                row.dataset.needsRedAnimation = 'true';
+              }
+              
+              // Helper to check if config is currently empty (dynamic check)
+              const checkConfigEmpty = () => {
+                if (!segment.enabled || segment.type === 'seed') return false;
+                if (segment.type === 'custom') {
+                  return !segment.value || !segment.value.trim();
+                } else if (configKey) {
+                  const configValue = config[configKey];
+                  return !configValue || (typeof configValue === 'string' && !configValue.trim());
+                }
+                return false;
+              };
               
               // Show/hide delete button on hover (for cleaner UI)
               row.onmouseenter = () => {
@@ -1725,8 +2733,10 @@ app.registerExtension({
                   deleteBtn.style.opacity = '1';
                   deleteBtn.style.pointerEvents = 'auto';
                 }
-                // Subtle highlight on hover
-                if (segment.enabled) {
+                // Subtle highlight on hover (respect empty state - check dynamically)
+                if (checkConfigEmpty()) {
+                  row.style.borderColor = 'rgba(239, 68, 68, 0.8)';
+                } else if (segment.enabled) {
                   row.style.borderColor = theme.primary;
                 } else {
                   row.style.borderColor = 'rgba(255, 255, 255, 0.15)';
@@ -1740,11 +2750,71 @@ app.registerExtension({
                   deleteBtn.style.opacity = '0';
                   deleteBtn.style.pointerEvents = 'none';
                 }
-                // Reset border
-                if (segment.enabled) {
+                // Reset border (respect empty state - check dynamically)
+                if (checkConfigEmpty()) {
+                  row.style.borderColor = emptyBorder;
+                } else if (segment.enabled) {
                   row.style.borderColor = theme.primaryLight;
                 } else {
                   row.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                }
+              };
+              
+              // Click handler to focus the corresponding config input
+              row.onclick = (e) => {
+                // Don't trigger if clicking on toggle, delete button, or drag handle
+                if (e.target.closest('.gensort-delete-btn') || 
+                    e.target.closest('input[type="checkbox"]') ||
+                    e.target.textContent === '⋮⋮') {
+                  return;
+                }
+                
+                // Only navigate for enabled segments with config
+                if (!segment.enabled || !effectiveConfigKey) return;
+                
+                // Skip segments that don't have editable config (seed is auto-detected)
+                if (segment.type === 'seed') return;
+                
+                // Helper to scroll and focus input
+                const scrollAndFocus = (inputKey, delay = 100) => {
+                  setTimeout(() => {
+                    const input = configInputElements[inputKey];
+                    if (input) {
+                      // Get the input's row/parent for better scroll positioning
+                      const inputRow = input.closest('div[style*="display: flex"]') || input;
+                      
+                      // Flash highlight effect on the target row
+                      const originalBg = inputRow.style.background;
+                      inputRow.style.transition = 'background 0.15s ease-out';
+                      inputRow.style.background = `${theme.accent}33`;
+                      
+                      // Scroll the input into view - centered for visibility
+                      inputRow.scrollIntoView({ behavior: 'instant', block: 'center' });
+                      
+                      // Focus immediately after snap scroll
+                      setTimeout(() => {
+                        input.focus();
+                        if (input.select) input.select();
+                        
+                        // Fade out highlight
+                        setTimeout(() => {
+                          inputRow.style.background = originalBg;
+                        }, 300);
+                      }, 50);
+                    }
+                  }, delay);
+                };
+                
+                // Expand config section if collapsed
+                if (!configExpanded) {
+                  configExpanded = true;
+                  renderUI();
+                  updateNodeSize();
+                  // Wait for render then scroll and focus
+                  scrollAndFocus(effectiveConfigKey, 150);
+                } else {
+                  // Config already expanded, just scroll and focus
+                  scrollAndFocus(effectiveConfigKey, 50);
                 }
               };
 
@@ -1762,11 +2832,7 @@ app.registerExtension({
               row.addEventListener('dragend', (e) => {
                 row.style.opacity = '1';
                 draggedIndex = null;
-                container.querySelectorAll('.gensort-drag-over').forEach(el => {
-                  el.classList.remove('gensort-drag-over');
-                  el.style.borderTop = '';
-                  el.style.borderBottom = '';
-                });
+                clearDropIndicator();
                 e.stopPropagation();
               });
 
@@ -1781,46 +2847,25 @@ app.registerExtension({
                 e.stopPropagation();
                 e.dataTransfer.dropEffect = 'move';
                 if (draggedIndex !== null && draggedIndex !== index) {
-                  // Determine if we're in the top or bottom half of the row
+                  // Track drop position for the drop handler
                   const rect = row.getBoundingClientRect();
                   const midpoint = rect.top + rect.height / 2;
-                  const mouseY = e.clientY;
-                  
-                  // Clear previous highlights
-                  row.style.borderTop = '';
-                  row.style.borderBottom = '';
-                  
-                  if (mouseY < midpoint) {
-                    // Top half - insert BEFORE this item
-                    row.classList.add('gensort-drag-over');
-                    row.style.borderTop = `3px solid ${theme.primary}`;
-                    dropPosition = 'before';
-                  } else {
-                    // Bottom half - insert AFTER this item
-                    row.classList.add('gensort-drag-over');
-                    row.style.borderBottom = `3px solid ${theme.primary}`;
-                    dropPosition = 'after';
-                  }
+                  dropPosition = e.clientY < midpoint ? 'before' : 'after';
+                  // Visual feedback handled by document-level dragover
                 }
               }, { capture: true });
 
               row.addEventListener('dragleave', (e) => {
-                row.classList.remove('gensort-drag-over');
-                row.style.borderTop = '';
-                row.style.borderBottom = '';
+                // Don't clear styles here - document-level handler manages all visual feedback
                 e.stopPropagation();
               });
 
               row.addEventListener('drop', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                row.classList.remove('gensort-drag-over');
-                row.style.borderTop = '';
-                row.style.borderBottom = '';
+                clearDropIndicator();
                 
                 if (draggedIndex !== null && draggedIndex !== index) {
-                  const [movedItem] = segments.splice(draggedIndex, 1);
-                  
                   // Calculate correct insert index based on drop position
                   let insertIndex;
                   if (dropPosition === 'before') {
@@ -1829,10 +2874,13 @@ app.registerExtension({
                     insertIndex = draggedIndex < index ? index : index + 1;
                   }
                   
+                  // Check if move would result in same position
+                  if (insertIndex === draggedIndex) return;
+                  
+                  const [movedItem] = segments.splice(draggedIndex, 1);
+                  if (insertIndex > draggedIndex) insertIndex -= 1;
                   segments.splice(insertIndex, 0, movedItem);
                   
-                  console.log("[FlowPath] Segments reordered from index", draggedIndex, "to", insertIndex);
-                  console.log("[FlowPath] New segment order:", segments.map(s => s.type).join(', '));
                   
                   // Clear active preset on user modification
                   activePresetName = null;
@@ -1847,18 +2895,45 @@ app.registerExtension({
               const dragHandle = document.createElement("span");
               dragHandle.textContent = "⋮⋮";
               dragHandle.style.cssText = `
-                margin-right: 10px;
+                margin-right: 8px;
                 color: rgba(255, 255, 255, 0.5);
                 user-select: none;
                 font-size: 16px;
               `;
               row.appendChild(dragHandle);
 
-              const icon = document.createElement("span");
-              icon.textContent = segInfo.icon;
-              icon.style.cssText = `
+              // Toggle indicator (filled/unfilled box) - positioned after drag handle
+              const isEnabled = segment.enabled !== false;
+              const toggleBox = document.createElement("div");
+              toggleBox.className = "segment-toggle";
+              toggleBox.title = isEnabled ? "Click to disable" : "Click to enable";
+              toggleBox.style.cssText = `
+                width: 12px;
+                height: 12px;
                 margin-right: 8px;
+                border-radius: 3px;
+                border: 2px solid ${isEnabled ? theme.accent : 'rgba(255, 255, 255, 0.3)'};
+                background: ${isEnabled ? theme.accent : 'transparent'};
+                cursor: pointer;
+                transition: all 0.15s ease;
+                flex-shrink: 0;
+              `;
+              toggleBox.onclick = (e) => {
+                e.stopPropagation();
+                segment.enabled = !segment.enabled;
+                activePresetName = null;
+                updateWidgetData();
+                renderUI();
+                updateNodeSize();
+              };
+              row.appendChild(toggleBox);
+
+              const icon = document.createElement("span");
+              icon.textContent = globalSettings.showEmojis ? segInfo.icon : '';
+              icon.style.cssText = `
+                margin-right: ${globalSettings.showEmojis ? '8px' : '0'};
                 font-size: 16px;
+                min-width: ${globalSettings.showEmojis ? '20px' : '0'};
               `;
               row.appendChild(icon);
 
@@ -1924,29 +2999,18 @@ app.registerExtension({
               };
               row.appendChild(deleteBtn);
 
-              const checkbox = document.createElement("input");
-              checkbox.type = "checkbox";
-              checkbox.checked = segment.enabled !== false;
-              checkbox.style.cssText = `
-                width: ${btnSize};
-                height: ${btnSize};
-                cursor: pointer;
-                accent-color: ${theme.accent};
-              `;
-              checkbox.onclick = (e) => {
-                e.stopPropagation();
-              };
-              checkbox.onchange = () => {
-                segment.enabled = checkbox.checked;
-                activePresetName = null; // Clear active preset on user modification
-                updateWidgetData();
-                renderUI();
-                updateNodeSize();
-              };
-              row.appendChild(checkbox);
-
               segmentsSection.content.appendChild(row);
             });
+            
+            // Trigger smooth red animation for empty segments after DOM is ready
+            setTimeout(() => {
+              const rowsNeedingAnimation = segmentsSection.content.querySelectorAll('[data-needs-red-animation="true"]');
+              rowsNeedingAnimation.forEach(row => {
+                row.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08))';
+                row.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                row.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.3), inset 0 0 8px rgba(239, 68, 68, 0.05)';
+              });
+            }, 50);
 
             // Add segment dropdown
             const addSegmentContainer = document.createElement("div");
@@ -1999,7 +3063,7 @@ app.registerExtension({
               const segInfo = SEGMENT_TYPES[type];
               const option = document.createElement("option");
               option.value = type;
-              option.textContent = `${segInfo.icon} ${segInfo.label}`;
+              option.textContent = globalSettings.showEmojis ? `${segInfo.icon} ${segInfo.label}` : segInfo.label;
               option.title = segInfo.tooltip || ""; // Add tooltip
               addSelect.appendChild(option);
             });
@@ -2007,7 +3071,7 @@ app.registerExtension({
             // Always add "Custom" option
             const customOption = document.createElement("option");
             customOption.value = "custom";
-            customOption.textContent = "✨ Custom";
+            customOption.textContent = globalSettings.showEmojis ? "✨ Custom" : "Custom";
             addSelect.appendChild(customOption);
 
             addSelect.onchange = async () => {
@@ -2051,7 +3115,7 @@ app.registerExtension({
           }
 
           // CONFIGURATION SECTION
-          const configSection = createSection("⚙️ Configuration", configExpanded, () => {
+          const configSection = createSection(`${emojiWithSpace('⚙️')}Configuration`, configExpanded, () => {
             configExpanded = !configExpanded;
             renderUI();
             updateNodeSize();
@@ -2078,6 +3142,22 @@ app.registerExtension({
           `;
           configSection.header.insertBefore(headerWarningOverlay, configSection.header.firstChild);
           
+          // Add warning text element inside config header
+          const configWarningText = document.createElement("span");
+          configWarningText.style.cssText = `
+            display: none;
+            margin-left: auto;
+            padding: 2px 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 10px;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+          `;
+          configSection.header.appendChild(configWarningText);
+          
           // Make sure header content is above the overlay
           Array.from(configSection.header.children).forEach(child => {
             if (child !== headerWarningOverlay) {
@@ -2088,22 +3168,64 @@ app.registerExtension({
 
           // Function to check for empty fields and update header styling
           const updateConfigHeaderWarning = () => {
-            const textFieldTypes = ["name", "project", "series", "resolution", "model", "lora"];
-            const hasEmptyFields = segments.some(seg => {
-              if (seg.enabled === false) return false;
+            const textFieldTypes = ["name", "project", "series", "resolution", "model", "lora", "date", "label"];
+            const configKeys = { 
+              name: "name", 
+              project: "project_name", 
+              series: "series_name", 
+              resolution: "resolution", 
+              model: "model_name", 
+              lora: "lora_name",
+              date: "date_format",
+              label: "node_label"
+            };
+            
+            const emptyFields = [];
+            segments.forEach(seg => {
+              if (seg.enabled === false) return;
               if (textFieldTypes.includes(seg.type)) {
-                const configKeys = { name: "name", project: "project_name", series: "series_name", resolution: "resolution", model: "model_name", lora: "lora_name" };
                 const key = configKeys[seg.type];
-                return !config[key] || !config[key].trim();
+                if (!config[key] || !config[key].trim()) {
+                  const segInfo = SEGMENT_TYPES[seg.type];
+                  emptyFields.push(segInfo ? segInfo.label : seg.type);
+                }
               }
               if (seg.type === "custom") {
-                return !seg.value || !seg.value.trim();
+                if (!seg.value || !seg.value.trim()) {
+                  emptyFields.push("Custom Template");
+                }
               }
-              return false;
             });
+            
+            const hasEmptyFields = emptyFields.length > 0;
 
             // Animate the overlay opacity
             headerWarningOverlay.style.opacity = hasEmptyFields ? '1' : '0';
+            segmentsWarningOverlay.style.opacity = hasEmptyFields ? '1' : '0';
+            
+            // Update header borders to red when warning is active
+            const warningBorder = 'rgba(239, 68, 68, 0.8)';
+            const normalBorder = theme.primaryLight;
+            configSection.header.style.borderColor = hasEmptyFields ? warningBorder : normalBorder;
+            segmentsSection.header.style.borderColor = hasEmptyFields ? warningBorder : normalBorder;
+            
+            // Update warning text in both headers
+            if (hasEmptyFields) {
+              const fieldCount = emptyFields.length;
+              const shortList = emptyFields.slice(0, 3).join(', ') + (emptyFields.length > 3 ? ` +${emptyFields.length - 3}` : '');
+              const warningText = `⚠️ ${fieldCount} empty`;
+              
+              segmentsWarningText.textContent = warningText;
+              segmentsWarningText.title = `Fields needing attention: ${emptyFields.join(', ')}. Click a segment to configure it.`;
+              segmentsWarningText.style.display = 'inline-block';
+              
+              configWarningText.textContent = warningText;
+              configWarningText.title = `Fields needing attention: ${emptyFields.join(', ')}`;
+              configWarningText.style.display = 'inline-block';
+            } else {
+              segmentsWarningText.style.display = 'none';
+              configWarningText.style.display = 'none';
+            }
           };
           
           // Initial header styling check
@@ -2145,7 +3267,7 @@ app.registerExtension({
               if (segment.type === "custom" && segment.enabled) {
                 configInputs.push({
                   key: `custom_segment_${segIndex}`,
-                  label: "✨ Custom Template",
+                  label: "Custom Segment",
                   type: "custom_segment",
                   segmentIndex: segIndex,
                   placeholder: "Template: {label}_{model}_{resolution}",
@@ -2224,7 +3346,7 @@ app.registerExtension({
                   input.style.cssText = `
                     flex: 1;
                     padding: 6px 10px;
-                    background: #1a1a1a;
+                    background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.3));
                     border: 1px solid ${theme.primaryLight};
                     border-radius: 6px;
                     color: #fff;
@@ -2264,8 +3386,8 @@ app.registerExtension({
                   input.style.cssText = `
                     flex: 1;
                     padding: 6px 10px;
-                    background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(139, 92, 246, 0.1));
-                    border: 1px solid ${isCustomEmpty ? 'rgba(239, 68, 68, 0.7)' : 'rgba(168, 85, 247, 0.5)'};
+                    background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.3));
+                    border: 1px solid ${isCustomEmpty ? 'rgba(239, 68, 68, 0.7)' : theme.primaryLight};
                     border-radius: 6px;
                     color: #fff;
                     font-size: 12px;
@@ -2277,7 +3399,7 @@ app.registerExtension({
                   const updateCustomEmptyStyle = () => {
                     const isNowEmpty = !input.value || !input.value.trim();
                     if (isNowEmpty) {
-                      // Input styling - red border and glow (keep purple background)
+                      // Input styling - red border and glow
                       input.style.borderColor = 'rgba(239, 68, 68, 0.7)';
                       input.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.15)';
                       // Row styling - red background and glow
@@ -2286,8 +3408,8 @@ app.registerExtension({
                       // Label styling - red color
                       label.style.color = 'rgba(248, 113, 113, 0.9)';
                     } else {
-                      // Input styling - normal purple
-                      input.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+                      // Input styling - normal (matches other inputs)
+                      input.style.borderColor = theme.primaryLight;
                       input.style.boxShadow = 'inset 0 1px 3px rgba(0, 0, 0, 0.3)';
                       // Row styling - normal
                       row.style.background = 'transparent';
@@ -2303,8 +3425,8 @@ app.registerExtension({
                       input.style.borderColor = 'rgba(239, 68, 68, 0.9)';
                       input.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.6), inset 0 0 8px rgba(239, 68, 68, 0.2)';
                     } else {
-                      input.style.borderColor = 'rgba(168, 85, 247, 0.8)';
-                      input.style.boxShadow = '0 0 0 2px rgba(168, 85, 247, 0.3)';
+                      input.style.borderColor = theme.primary;
+                      input.style.boxShadow = `0 0 0 2px ${theme.primaryLight}`;
                     }
                   };
                   input.onblur = () => {
@@ -2325,6 +3447,10 @@ app.registerExtension({
                     updateNodeSize();
                   };
                   row.appendChild(input);
+                  
+                  // Store reference for click-to-focus from segment rows
+                  configInputElements[item.key] = input;
+                  
                   configSection.content.appendChild(row);
                   return; // Skip the default onchange and auto-detect button logic
                 } else {
@@ -2392,6 +3518,35 @@ app.registerExtension({
                     updateEmptyStyle();
                     config[item.key] = input.value; // Update config immediately for header check
                     updateConfigHeaderWarning(); // Update header in real-time
+                    updateWidgetData();
+                    
+                    // Update output preview in real-time
+                    updatePreview();
+                    
+                    // Update segment row styling in real-time
+                    // Find the segment row with matching config key and update its styling
+                    if (segmentsContentEl) {
+                      const segmentRows = segmentsContentEl.querySelectorAll('[data-config-key]');
+                      segmentRows.forEach(row => {
+                        if (row.dataset.configKey === item.key) {
+                          const isEmpty = !input.value || !input.value.trim();
+                          const emptyBackground = 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.08))';
+                          const emptyBorder = 'rgba(239, 68, 68, 0.5)';
+                          const baseBackground = theme.gradient;
+                          const baseBorder = theme.primaryLight;
+                          
+                          if (isEmpty) {
+                            row.style.background = emptyBackground;
+                            row.style.borderColor = emptyBorder;
+                            row.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.3), inset 0 0 8px rgba(239, 68, 68, 0.05)';
+                          } else {
+                            row.style.background = baseBackground;
+                            row.style.borderColor = baseBorder;
+                            row.style.boxShadow = '';
+                          }
+                        }
+                      });
+                    }
                   };
                 }
 
@@ -2415,7 +3570,22 @@ app.registerExtension({
                   }
                   
                   updateWidgetData();
-                  preview.innerHTML = `<strong style="color: ${theme.accent};">📁 Output Path:</strong><br><span style="color: #fff; font-weight: 500;">${buildPreviewPath()}</span>`;
+                  
+                  // Update preview (don't call renderUI to avoid double-click accordion issue)
+                  updatePreview();
+                  
+                  // For select inputs (dropdowns), update the corresponding segment row styling
+                  if (item.type === "select" && segmentsContentEl) {
+                    const segmentRows = segmentsContentEl.querySelectorAll('[data-config-key]');
+                    segmentRows.forEach(row => {
+                      if (row.dataset.configKey === item.key) {
+                        // Select fields are never "empty" since they have default values
+                        row.style.background = theme.gradient;
+                        row.style.borderColor = theme.primaryLight;
+                        row.style.boxShadow = '';
+                      }
+                    });
+                  }
                 };
 
                 // Store references to category and name inputs for dynamic updates
@@ -2426,10 +3596,12 @@ app.registerExtension({
                 }
 
                 row.appendChild(input);
+                
+                // Store reference for click-to-focus from segment rows
+                configInputElements[item.key] = input;
 
                 // Add auto-detect button for Model, LoRA, and Resolution fields
                 if (item.key === "model_name" || item.key === "lora_name" || item.key === "resolution") {
-                  console.log("[FlowPath] Creating auto-detect button for:", item.key);
                   const detectBtn = document.createElement("button");
                   detectBtn.textContent = "↻";
                   let titleText = "Auto-detect from workflow";
@@ -2472,8 +3644,6 @@ app.registerExtension({
                   };
 
                   detectBtn.onclick = () => {
-                    console.log("[FlowPath] ===== BUTTON CLICKED =====");
-                    console.log("[FlowPath] Field type:", item.key);
                     
                     // Show loading spinner
                     detectBtn.textContent = "⏳";
@@ -2483,8 +3653,6 @@ app.registerExtension({
                     // Use setTimeout to allow UI to update before detection
                     setTimeout(() => {
                       try {
-                        console.log("[FlowPath] Auto-detect button clicked for:", item.key);
-                        console.log("[FlowPath] Current graph:", app.graph);
                         
                         if (item.key === "model_name") {
                         // Detect model
@@ -2496,7 +3664,7 @@ app.registerExtension({
                           config[item.key] = modelName;
                           activePresetName = null; // Clear active preset on auto-detect modification
                           updateWidgetData();
-                          preview.innerHTML = `<strong style="color: ${theme.accent};">📁 Output Path:</strong><br><span style="color: #fff; font-weight: 500;">${buildPreviewPath()}</span>`;
+                          updatePreview();
                           
                           // Remove red highlight since field is now filled - input, row, and label
                           input.style.borderColor = theme.primaryLight;
@@ -2506,18 +3674,18 @@ app.registerExtension({
                           label.style.color = 'rgba(255, 255, 255, 0.8)';
                           
                           // Update config header warning
-                          updateConfigHeaderWarning();
-                          
-                          // Visual feedback
-                          detectBtn.textContent = "✅";
-                          setTimeout(() => { detectBtn.textContent = "↻"; }, 1000);
-                          
-                          // Toast notification with multiple model warning
-                          if (detected.total > 1) {
-                            showToast(`Model detected: ${modelName} (${detected.total} checkpoint nodes found, using first)`, "success", 4000);
-                          } else {
-                            showToast(`Model detected: ${modelName}`, "success");
-                          }
+                           updateConfigHeaderWarning();
+                           
+                           // Re-render UI to update segment row styling (removes red warning)
+                           renderUI();
+                           updateNodeSize();
+                           
+                           // Toast notification with multiple model warning
+                           if (detected.total > 1) {
+                             showToast(`Model detected: ${modelName} (${detected.total} checkpoint nodes found, using first)`, "success", 4000);
+                           } else {
+                             showToast(`Model detected: ${modelName}`, "success");
+                           }
                         } else {
                           // No model found
                           detectBtn.textContent = "❌";
@@ -2530,12 +3698,9 @@ app.registerExtension({
                       } else if (item.key === "lora_name") {
                         // Detect LoRAs
                         const detected = detectLorasFromWorkflow(app.graph);
-                        console.log("[FlowPath] Detection result:", detected);
-                        console.log("[FlowPath] Current LoRA format setting:", globalSettings.loraPathFormat);
                         
                         if (detected && detected.length > 0) {
                           const formatted = formatLoraPath(detected, globalSettings.loraPathFormat);
-                          console.log("[FlowPath] Formatted LoRAs:", formatted, "Type:", typeof formatted);
                           
                           // Handle separate folders mode (returns array)
                           if (Array.isArray(formatted)) {
@@ -2543,20 +3708,15 @@ app.registerExtension({
                             const joinedValue = formatted.join(" | ");
                             input.value = formatted.join(", "); // Display with commas
                             config[item.key] = joinedValue; // Store as delimited string for backend
-                            console.log("[FlowPath] Stored as pipe-delimited:", joinedValue);
                           } else {
                             input.value = formatted;
                             config[item.key] = formatted;
-                            console.log("[FlowPath] Stored as string:", formatted);
                           }
                           
-                          console.log("[FlowPath] Final config.lora_name:", config.lora_name);
                           activePresetName = null; // Clear active preset on auto-detect modification
                           updateWidgetData();
                           
-                          const previewPath = buildPreviewPath();
-                          console.log("[FlowPath] Preview path:", previewPath);
-                          preview.innerHTML = `<strong style="color: ${theme.accent};">📁 Output Path:</strong><br><span style="color: #fff; font-weight: 500;">${previewPath}</span>`;
+                          updatePreview();
                           
                           // Remove red highlight since field is now filled - input, row, and label
                           input.style.borderColor = theme.primaryLight;
@@ -2566,17 +3726,17 @@ app.registerExtension({
                           label.style.color = 'rgba(255, 255, 255, 0.8)';
                           
                           // Update config header warning
-                          updateConfigHeaderWarning();
-                          
-                          // Visual feedback
-                          detectBtn.textContent = "✅";
-                          setTimeout(() => { detectBtn.textContent = "↻"; }, 1000);
-                          
-                          // Toast notification
-                          const loraCount = Array.isArray(detected) ? detected.length : 1;
-                          showToast(`Detected ${loraCount} LoRA${loraCount > 1 ? 's' : ''}`, "success");
-                        } else {
-                          // No LoRAs found
+                           updateConfigHeaderWarning();
+                           
+                           // Re-render UI to update segment row styling (removes red warning)
+                           renderUI();
+                           updateNodeSize();
+                           
+                           // Toast notification
+                           const loraCount = Array.isArray(detected) ? detected.length : 1;
+                           showToast(`Detected ${loraCount} LoRA${loraCount > 1 ? 's' : ''}`, "success");
+                         } else {
+                           // No LoRAs found
                           detectBtn.textContent = "❌";
                           setTimeout(() => { detectBtn.textContent = "↻"; }, 1000);
                           console.warn("[FlowPath] No LoRA nodes found in workflow");
@@ -2594,7 +3754,7 @@ app.registerExtension({
                           config[item.key] = resolutionValue;
                           activePresetName = null; // Clear active preset on auto-detect modification
                           updateWidgetData();
-                          preview.innerHTML = `<strong style="color: ${theme.accent};">📁 Output Path:</strong><br><span style="color: #fff; font-weight: 500;">${buildPreviewPath()}</span>`;
+                          updatePreview();
                           
                           // Remove red highlight since field is now filled - input, row, and label
                           input.style.borderColor = theme.primaryLight;
@@ -2604,20 +3764,20 @@ app.registerExtension({
                           label.style.color = 'rgba(255, 255, 255, 0.8)';
                           
                           // Update config header warning
-                          updateConfigHeaderWarning();
-                          
-                          // Visual feedback
-                          detectBtn.textContent = "✅";
-                          setTimeout(() => { detectBtn.textContent = "↻"; }, 1000);
-                          
-                          // Toast notification with multiple node warning
-                          if (detected.total > 1) {
-                            showToast(`Resolution detected: ${resolutionValue} (${detected.total} latent nodes found, using first)`, "success", 4000);
-                          } else {
-                            showToast(`Resolution detected: ${resolutionValue}`, "success");
-                          }
-                        } else {
-                          // No resolution found
+                           updateConfigHeaderWarning();
+                           
+                           // Re-render UI to update segment row styling (removes red warning)
+                           renderUI();
+                           updateNodeSize();
+                           
+                           // Toast notification with multiple node warning
+                           if (detected.total > 1) {
+                             showToast(`Resolution detected: ${resolutionValue} (${detected.total} latent nodes found, using first)`, "success", 4000);
+                           } else {
+                             showToast(`Resolution detected: ${resolutionValue}`, "success");
+                           }
+                         } else {
+                           // No resolution found
                           detectBtn.textContent = "❌";
                           setTimeout(() => { detectBtn.textContent = "↻"; }, 1000);
                           console.warn("[FlowPath] No latent image node found in workflow");
@@ -2656,43 +3816,135 @@ app.registerExtension({
             }
           }
 
-          // FILENAME SECTION (for Image Saver compatibility)
-          const filenameSection = createSection("📝 Filename (for Image Saver)", filenameExpanded, () => {
-            filenameExpanded = !filenameExpanded;
-            renderUI();
-            updateNodeSize();
-          });
-          container.appendChild(filenameSection.section);
-
-          if (filenameExpanded) {
-            // Description
-            const filenameDesc = document.createElement("div");
-            filenameDesc.style.cssText = `
-              color: rgba(255, 255, 255, 0.6);
-              font-size: 11px;
-              margin-bottom: 10px;
-              line-height: 1.4;
+          // FILENAME SECTION (for Image Saver compatibility) - only show in Image Saver mode
+          const isImageSaverMode = config.output_mode === 'imageSaver';
+          const isFilenameEmpty = !config.filename_template || !config.filename_template.trim();
+          
+          if (isImageSaverMode) {
+            const filenameSection = createSection(`${emojiWithSpace('📝')}Filename`, filenameExpanded, () => {
+              filenameExpanded = !filenameExpanded;
+              renderUI();
+              updateNodeSize();
+            });
+            
+            // Add red warning overlay to filename header (same as segments/config)
+            filenameSection.header.style.position = 'relative';
+            filenameSection.header.style.overflow = 'hidden';
+            filenameSection.header.style.transition = 'border-color 0.5s ease-in-out';
+            
+            const filenameWarningOverlay = document.createElement("div");
+            filenameWarningOverlay.style.cssText = `
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: linear-gradient(90deg, rgba(153, 27, 27, 0.8) 0%, rgba(220, 38, 38, 0.7) 50%, rgba(239, 68, 68, 0.8) 100%);
+              opacity: ${isFilenameEmpty ? '1' : '0'};
+              transition: opacity 0.5s ease-in-out;
+              pointer-events: none;
+              border-radius: 5px;
+              z-index: 0;
             `;
-            filenameDesc.innerHTML = `Build filename pattern for Image Saver. Use <span style="color: ${theme.accent};">{variables}</span> for FlowPath values and <span style="color: ${theme.secondary};">%variables</span> for Image Saver values.`;
-            filenameSection.content.appendChild(filenameDesc);
+            filenameSection.header.insertBefore(filenameWarningOverlay, filenameSection.header.firstChild);
+            
+            // Update header border based on warning state
+            filenameSection.header.style.borderColor = isFilenameEmpty ? 'rgba(239, 68, 68, 0.8)' : theme.primaryLight;
+            
+            // Add warning text element inside filename header
+            const filenameWarningText = document.createElement("span");
+            filenameWarningText.style.cssText = `
+              display: ${isFilenameEmpty ? 'inline-block' : 'none'};
+              margin-left: auto;
+              padding: 2px 8px;
+              background: rgba(0, 0, 0, 0.3);
+              border-radius: 4px;
+              color: rgba(255, 255, 255, 0.9);
+              font-size: 10px;
+              font-weight: 500;
+              position: relative;
+              z-index: 1;
+            `;
+            filenameWarningText.textContent = "⚠️ 1 empty";
+            filenameWarningText.title = "Filename pattern is empty";
+            filenameSection.header.appendChild(filenameWarningText);
+            
+            // Make sure header content is above the overlay
+            Array.from(filenameSection.header.children).forEach(child => {
+              if (child !== filenameWarningOverlay) {
+                child.style.position = 'relative';
+                child.style.zIndex = '1';
+              }
+            });
+            
+            container.appendChild(filenameSection.section);
 
-            // Filename input
+            if (filenameExpanded) {
+            // Filename preview (moved to top, above pattern input)
+            const filenamePreview = document.createElement("div");
+            const previewIsEmpty = isFilenameEmpty;
+            filenamePreview.style.cssText = `
+              margin-bottom: 10px;
+              padding: 8px 10px;
+              background: ${previewIsEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.3)'};
+              border-radius: 6px;
+              border-left: 3px solid ${previewIsEmpty ? 'rgba(239, 68, 68, 0.7)' : theme.secondary};
+              font-family: 'Consolas', 'Monaco', monospace;
+              font-size: 11px;
+              transition: all 0.3s ease;
+            `;
+            
+            // Build filename preview
+            let filenamePreviewText = config.filename_template || "(empty - Image Saver will use its default)";
+            if (config.filename_template) {
+              filenamePreviewText = replaceTemplateVars(config.filename_template, true);
+            }
+            
+            const previewColor = previewIsEmpty ? 'rgba(239, 68, 68, 0.8)' : '#fff';
+            filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: ${previewColor}; ${previewIsEmpty ? 'font-style: italic;' : ''}">${filenamePreviewText}</span>`;
+            filenameSection.content.appendChild(filenamePreview);
+
+            // Filename input row with info icon
             const filenameInputRow = document.createElement("div");
             filenameInputRow.style.cssText = `
               display: flex;
               align-items: center;
               margin-bottom: 10px;
+              gap: 6px;
             `;
 
             const filenameLabel = document.createElement("label");
             filenameLabel.textContent = "Pattern:";
             filenameLabel.style.cssText = `
-              flex: 0 0 60px;
+              flex: 0 0 auto;
               color: rgba(255, 255, 255, 0.8);
               font-size: 12px;
               font-weight: 500;
             `;
             filenameInputRow.appendChild(filenameLabel);
+            
+            // Info icon with tooltip
+            const infoIcon = document.createElement("span");
+            infoIcon.textContent = "i";
+            infoIcon.title = "Build filename pattern for Image Saver.\\n\\n• {variables} - FlowPath values (replaced before saving)\\n• %variables - Image Saver values (processed by Image Saver)\\n\\nExample: {name}_%seed or {label}_%time_%seed";
+            infoIcon.style.cssText = `
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 14px;
+              height: 14px;
+              border-radius: 50%;
+              background: rgba(255,255,255,0.1);
+              border: 1px solid rgba(255,255,255,0.2);
+              color: rgba(255,255,255,0.5);
+              font-size: 9px;
+              font-weight: bold;
+              font-style: italic;
+              font-family: Georgia, serif;
+              cursor: help;
+              flex-shrink: 0;
+            `;
+            filenameInputRow.appendChild(infoIcon);
 
             const filenameInput = document.createElement("input");
             filenameInput.type = "text";
@@ -2717,10 +3969,32 @@ app.registerExtension({
               filenameInput.style.borderColor = theme.primaryLight;
               filenameInput.style.boxShadow = 'none';
             };
+            // Real-time preview update as user types
+            filenameInput.oninput = () => {
+              config.filename_template = filenameInput.value;
+              updateWidgetData();
+              updatePreview();
+              // Update the local preview in filename section
+              const isEmpty = !filenameInput.value.trim();
+              let previewText = filenameInput.value || "(empty - Image Saver will use its default)";
+              if (filenameInput.value) {
+                previewText = replaceTemplateVars(filenameInput.value, true);
+              }
+              const pColor = isEmpty ? 'rgba(239, 68, 68, 0.8)' : '#fff';
+              filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: ${pColor}; ${isEmpty ? 'font-style: italic;' : ''}">${previewText}</span>`;
+              filenamePreview.style.background = isEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.3)';
+              filenamePreview.style.borderLeftColor = isEmpty ? 'rgba(239, 68, 68, 0.7)' : theme.secondary;
+              
+              // Update warning overlay, text, and header border
+              filenameWarningOverlay.style.opacity = isEmpty ? '1' : '0';
+              filenameWarningText.style.display = isEmpty ? 'inline-block' : 'none';
+              filenameSection.header.style.borderColor = isEmpty ? 'rgba(239, 68, 68, 0.8)' : theme.primaryLight;
+            };
             filenameInput.onchange = () => {
               config.filename_template = filenameInput.value;
               activePresetName = null;
               updateWidgetData();
+              // Full re-render to update filename section and header warning
               renderUI();
             };
             filenameInputRow.appendChild(filenameInput);
@@ -2874,66 +4148,31 @@ app.registerExtension({
             quickInsertContainer.appendChild(imageSaverBtnsRow);
 
             filenameSection.content.appendChild(quickInsertContainer);
-
-            // Filename preview
-            const filenamePreview = document.createElement("div");
-            filenamePreview.style.cssText = `
-              margin-top: 10px;
-              padding: 8px 10px;
-              background: rgba(0, 0, 0, 0.3);
-              border-radius: 6px;
-              border-left: 3px solid ${theme.secondary};
-              font-family: 'Consolas', 'Monaco', monospace;
-              font-size: 11px;
-            `;
-            
-            // Build filename preview
-            let filenamePreviewText = config.filename_template || "(empty - Image Saver will use its default)";
-            if (config.filename_template) {
-              // Replace FlowPath variables for preview
-              filenamePreviewText = replaceTemplateVars(config.filename_template, true);
             }
-            
-            filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${filenamePreviewText}</span>`;
-            filenameSection.content.appendChild(filenamePreview);
           }
 
           // PRESETS SECTION
-          const presetsSection = createSection("💾 Presets", presetsExpanded, () => {
+          const presetsSection = createSection(`${emojiWithSpace('💾')}Presets`, presetsExpanded, () => {
             presetsExpanded = !presetsExpanded;
             
             // When opening presets section, refresh global presets from localStorage
             if (presetsExpanded) {
               const freshGlobalPresets = loadGlobalPresets();
               
-              // Add any new global presets that don't exist locally
+              // Only ADD new global presets that don't exist locally
+              // Don't delete existing presets - they may be from the workflow or unsaved
+              let addedCount = 0;
               Object.keys(freshGlobalPresets).forEach(presetName => {
                 if (!presets[presetName]) {
                   presets[presetName] = freshGlobalPresets[presetName];
-                  console.log(`[FlowPath] Loaded new global preset: "${presetName}"`);
+                  addedCount++;
                 }
               });
               
-              // Remove any custom presets that were deleted from global storage
-              // (only remove custom presets, not default presets)
-              Object.keys(presets).forEach(presetName => {
-                const isDefaultPreset = defaultPresets.hasOwnProperty(presetName);
-                const existsInGlobal = freshGlobalPresets.hasOwnProperty(presetName);
-                
-                // If it's a custom preset and it's not in global storage, it was deleted
-                if (!isDefaultPreset && !existsInGlobal) {
-                  delete presets[presetName];
-                  console.log(`[FlowPath] Removed deleted global preset: "${presetName}"`);
-                  
-                  // Clear active preset if it was the deleted one
-                  if (activePresetName === presetName) {
-                    activePresetName = null;
-                  }
-                }
-              });
-              
-              // Update widget data to reflect changes
-              updateWidgetData();
+              if (addedCount > 0) {
+                // Update widget data to reflect changes
+                updateWidgetData();
+              }
             }
             
             renderUI();
@@ -2942,12 +4181,50 @@ app.registerExtension({
           container.appendChild(presetsSection.section);
 
           if (presetsExpanded) {
+           try {
             // Separate default and custom presets
             const defaultPresetNames = Object.keys(defaultPresets);
             const customPresetNames = Object.keys(presets).filter(name => !defaultPresets.hasOwnProperty(name));
             
+            // Multi-select tracking for custom presets
+            const selectedPresets = new Set();
+            let lastSelectedIndex = -1;
+            const presetRowElements = new Map(); // Map preset name to its row element
+            
+            // Helper to update selection visuals
+            const updateSelectionVisuals = () => {
+              presetRowElements.forEach((rowEl, presetName) => {
+                const isSelected = selectedPresets.has(presetName);
+                const selectionBox = rowEl.querySelector('.preset-checkbox');
+                if (selectionBox) {
+                  // Update filled/unfilled box style
+                  selectionBox.style.background = isSelected ? theme.accent : 'transparent';
+                  selectionBox.style.borderColor = isSelected ? theme.accent : 'rgba(255, 255, 255, 0.3)';
+                }
+                // Update row styling for selection
+                if (isSelected) {
+                  rowEl.style.background = 'rgba(168, 85, 247, 0.2)';
+                  rowEl.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+                } else if (activePresetName === presetName) {
+                  rowEl.style.background = 'rgba(34, 197, 94, 0.15)';
+                  rowEl.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+                } else {
+                  rowEl.style.background = 'rgba(255, 255, 255, 0.03)';
+                  rowEl.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                }
+              });
+              
+              // Show/hide delete selected button
+              const deleteSelectedBtn = presetsSection.content.querySelector('.delete-selected-btn');
+              if (deleteSelectedBtn) {
+                deleteSelectedBtn.style.display = selectedPresets.size > 0 ? 'flex' : 'none';
+                deleteSelectedBtn.textContent = `Delete Selected (${selectedPresets.size})`;
+              }
+            };
+            
             // Helper function to render preset row
             const renderPresetRow = (name, isDefaultPreset, parentContainer) => {
+              try {
                 // Check if this preset is currently active
                 const isActive = activePresetName === name;
                 
@@ -2967,12 +4244,17 @@ app.registerExtension({
                   box-shadow: ${isActive ? '0 0 12px rgba(34, 197, 94, 0.3), inset 0 0 12px rgba(34, 197, 94, 0.08)' : 'none'};
                 `;
                 presetRow.onmouseenter = () => {
-                  if (!isActive) {
-                    presetRow.style.background = 'rgba(255, 255, 255, 0.06)';
-                    presetRow.style.borderColor = theme.primaryLight;
-                  } else {
+                  // Only check selection for custom presets
+                  const isSelected = !isDefaultPreset && selectedPresets.has(name);
+                  if (isSelected) {
+                    presetRow.style.background = 'rgba(168, 85, 247, 0.3)';
+                    presetRow.style.borderColor = 'rgba(168, 85, 247, 0.6)';
+                  } else if (isActive) {
                     presetRow.style.background = 'rgba(34, 197, 94, 0.2)';
                     presetRow.style.borderColor = 'rgba(34, 197, 94, 0.7)';
+                  } else {
+                    presetRow.style.background = 'rgba(255, 255, 255, 0.06)';
+                    presetRow.style.borderColor = theme.primaryLight;
                   }
                   // Show delete button on hover (only for custom presets)
                   const deleteBtn = presetRow.querySelector('.preset-delete-btn');
@@ -2982,12 +4264,17 @@ app.registerExtension({
                   }
                 };
                 presetRow.onmouseleave = () => {
-                  if (!isActive) {
-                    presetRow.style.background = 'rgba(255, 255, 255, 0.03)';
-                    presetRow.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                  } else {
+                  // Only check selection for custom presets
+                  const isSelected = !isDefaultPreset && selectedPresets.has(name);
+                  if (isSelected) {
+                    presetRow.style.background = 'rgba(168, 85, 247, 0.2)';
+                    presetRow.style.borderColor = 'rgba(168, 85, 247, 0.5)';
+                  } else if (isActive) {
                     presetRow.style.background = 'rgba(34, 197, 94, 0.15)';
                     presetRow.style.borderColor = 'rgba(34, 197, 94, 0.5)';
+                  } else {
+                    presetRow.style.background = 'rgba(255, 255, 255, 0.03)';
+                    presetRow.style.borderColor = 'rgba(255, 255, 255, 0.05)';
                   }
                   // Hide delete button when not hovering
                   const deleteBtn = presetRow.querySelector('.preset-delete-btn');
@@ -2997,29 +4284,91 @@ app.registerExtension({
                   }
                 };
 
-                const presetName = document.createElement("span");
-                presetName.textContent = isActive ? `${name}` : name;
-                presetName.style.cssText = `
-                  flex: 1;
+                // Add selection indicator for custom presets (filled/unfilled box)
+                if (!isDefaultPreset) {
+                  const isSelected = selectedPresets.has(name);
+                  const selectionBox = document.createElement("div");
+                  selectionBox.className = "preset-checkbox";
+                  selectionBox.style.cssText = `
+                    width: 12px;
+                    height: 12px;
+                    margin-right: 8px;
+                    border-radius: 3px;
+                    border: 2px solid ${isSelected ? theme.accent : 'rgba(255, 255, 255, 0.3)'};
+                    background: ${isSelected ? theme.accent : 'transparent'};
+                    transition: all 0.15s ease;
+                    flex-shrink: 0;
+                  `;
+                  presetRow.appendChild(selectionBox);
+                  
+                  // Store row reference for selection updates
+                  presetRowElements.set(name, presetRow);
+                  
+                  // Make entire row clickable for selection
+                  presetRow.style.cursor = 'pointer';
+                  presetRow.onclick = (e) => {
+                    // Don't trigger selection if clicking on buttons
+                    if (e.target.closest('button')) return;
+                    
+                    const currentIndex = customPresetNames.indexOf(name);
+                    
+                    if (e.shiftKey && lastSelectedIndex !== -1) {
+                      // Shift+click: select range
+                      const start = Math.min(lastSelectedIndex, currentIndex);
+                      const end = Math.max(lastSelectedIndex, currentIndex);
+                      for (let i = start; i <= end; i++) {
+                        selectedPresets.add(customPresetNames[i]);
+                      }
+                    } else {
+                      // Regular click: toggle selection
+                      if (selectedPresets.has(name)) {
+                        selectedPresets.delete(name);
+                      } else {
+                        selectedPresets.add(name);
+                      }
+                    }
+                    lastSelectedIndex = currentIndex;
+                    updateSelectionVisuals();
+                  };
+                }
+                
+                const presetNameEl = document.createElement("span");
+                presetNameEl.textContent = isActive ? `${name}` : name;
+                presetNameEl.style.cssText = `
                   color: ${isActive ? 'rgba(134, 239, 172, 1)' : '#fff'};
                   font-size: 12px;
                   font-weight: ${isActive ? '600' : '500'};
                   transition: color 0.4s ease-in-out;
                 `;
-                presetRow.appendChild(presetName);
+                presetRow.appendChild(presetNameEl);
+                 
+                 // Add mode badge to show which output mode the preset was saved in (skip for Blank preset)
+                 if (name !== "Blank") {
+                   const presetData = presets[name];
+                   const presetMode = presetData?.config?.output_mode || 'saveImage';
+                   const modeBadge = document.createElement("span");
+                   modeBadge.textContent = presetMode === 'imageSaver' ? 'IS' : 'SI';
+                   modeBadge.title = presetMode === 'imageSaver' ? 'Image Saver mode' : 'Save Image mode';
+                   const badgeColor = presetMode === 'imageSaver' ? theme.accent : 'rgba(59, 130, 246, 0.8)';
+                   modeBadge.style.cssText = `
+                     margin-left: 8px;
+                     padding: 2px 6px;
+                     background: ${badgeColor}20;
+                     border: 1px solid ${badgeColor};
+                     border-radius: 4px;
+                     color: ${badgeColor};
+                     font-size: 9px;
+                     font-weight: 600;
+                     letter-spacing: 0.5px;
+                     flex-shrink: 0;
+                   `;
+                   presetRow.appendChild(modeBadge);
+                 }
                 
-                // Add active indicator checkmark for loaded preset
-                if (isActive) {
-                  const activeIndicator = document.createElement("span");
-                  activeIndicator.textContent = "✓";
-                  activeIndicator.style.cssText = `
-                    color: rgba(34, 197, 94, 1);
-                    font-size: 14px;
-                    font-weight: bold;
-                    margin-right: 8px;
-                  `;
-                  presetRow.insertBefore(activeIndicator, presetName);
-                }
+                // Spacer to push buttons to the right
+                const spacer = document.createElement("div");
+                spacer.style.cssText = `flex: 1;`;
+                presetRow.appendChild(spacer);
 
                 const loadBtn = document.createElement("button");
                 loadBtn.textContent = "▼";
@@ -3053,27 +4402,48 @@ app.registerExtension({
                   loadBtn.style.filter = 'brightness(1)';
                   loadBtn.style.boxShadow = 'none';
                 };
-                loadBtn.onclick = () => {
-                  const preset = presets[name];
-                  // Preserve the node_label since it identifies this specific node, not the preset
-                  const currentLabel = config.node_label;
-                  
-                  segments = JSON.parse(JSON.stringify(preset.segments));
-                  config = JSON.parse(JSON.stringify(preset.config));
-                  
-                  // Restore the node label
-                  config.node_label = currentLabel;
+                loadBtn.onclick = (e) => {
+                   e.stopPropagation(); // Prevent row selection
+                   // For default presets, use defaultPresets directly since they might not be in the merged presets
+                   const preset = presets[name] || defaultPresets[name];
+                   if (!preset) {
+                     console.error("[FlowPath] Preset not found:", name);
+                     showToast(`Preset "${name}" not found!`, "error", 2000);
+                     return;
+                   }
+                   // Preserve certain settings that shouldn't be overwritten by presets
+                    const currentLabel = config.node_label;
+                    const currentOutputMode = config.output_mode;
+                   
+                   segments = JSON.parse(JSON.stringify(preset.segments));
+                   config = JSON.parse(JSON.stringify(preset.config));
+                   
+                   // Restore preserved settings
+                   config.node_label = currentLabel;
+                   // Only restore output_mode if preset doesn't specify one (e.g., Blank preset)
+                   if (!preset.config.output_mode) {
+                     config.output_mode = currentOutputMode;
+                   }
                   
                   // Set this preset as active for visual highlighting
                   activePresetName = name;
                   
                   updateWidgetData();
-                  renderUI();
-                  updateNodeSize();
-                  
-                  // Show success toast
-                  showToast(`Preset "${name}" loaded successfully!`, "success", 2000);
-                };
+                   
+                   // Render the new UI first, then show animation overlay on top
+                   renderUI();
+                   updateNodeSize();
+                   // Scroll to top after loading preset so user sees the new configuration
+                   container.scrollTop = 0;
+                   
+                   // Show loading animation AFTER renderUI so it doesn't get removed by innerHTML = ""
+                    if (globalSettings.showLoadingAnimation) {
+                      showContainerLoadingAnimation(`Loaded "${name}"`);
+                    } else {
+                      // Show toast notification instead
+                      showToast(`Loaded preset "${name}"`, "success", 2000);
+                    }
+                 };
 
                 // Only add delete button for custom presets (not default presets)
                 if (!isDefaultPreset) {
@@ -3159,7 +4529,8 @@ app.registerExtension({
                   cancelBtn.onmouseout = () => {
                     cancelBtn.style.background = 'rgba(255, 255, 255, 0.1)';
                   };
-                  cancelBtn.onclick = () => {
+                  cancelBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent row selection
                     confirmRow.style.display = 'none';
                     deleteBtn.textContent = "×";
                     deleteBtn.style.background = 'rgba(255, 0, 0, 0.2)';
@@ -3186,7 +4557,8 @@ app.registerExtension({
                     confirmBtn.style.background = 'rgba(255, 0, 0, 0.5)';
                     confirmBtn.style.transform = 'scale(1)';
                   };
-                  confirmBtn.onclick = () => {
+                  confirmBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent row selection
                     const deletedName = name; // Capture the name before deleting
                     delete presets[name];
                     
@@ -3198,9 +4570,13 @@ app.registerExtension({
                     }
                     
                     updateWidgetData();
-                    renderUI();
-                    updateNodeSize();
-                    container.focus();
+                    
+                    // Defer renderUI to avoid DOM conflicts
+                    setTimeout(() => {
+                      renderUI();
+                      updateNodeSize();
+                      container.focus();
+                    }, 0);
                     
                     // Sync the deletion to all other FlowPath nodes in this workflow
                     syncPresetsToAllNodes(null, deletedName);
@@ -3213,7 +4589,8 @@ app.registerExtension({
                   confirmBtns.appendChild(confirmBtn);
                   confirmRow.appendChild(confirmBtns);
 
-                  deleteBtn.onclick = () => {
+                  deleteBtn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent row selection
                     confirmRow.style.display = 'flex';
                     deleteBtn.textContent = "⚠";
                     deleteBtn.style.background = 'rgba(255, 0, 0, 0.5)';
@@ -3225,128 +4602,79 @@ app.registerExtension({
                   presetWrapper.appendChild(presetRow);
                   presetWrapper.appendChild(confirmRow);
                 } else {
-                  // Default preset - add reset button if modified, then load button
-                  const currentPreset = presets[name];
-                  const originalPreset = defaultPresets[name];
-                  const isModified = JSON.stringify(currentPreset) !== JSON.stringify(originalPreset);
-                  
-                  if (isModified) {
-                    const resetBtn = document.createElement("button");
-                    resetBtn.className = 'preset-reset-btn';
-                    resetBtn.textContent = "↺";
-                    resetBtn.title = "Reset to default";
-                    resetBtn.style.cssText = `
-                      width: 24px;
-                      height: 24px;
-                      padding: 0;
-                      background: rgba(251, 191, 36, 0.3);
-                      border: 1px solid rgba(251, 191, 36, 0.5);
-                      border-radius: 4px;
-                      color: #fbbf24;
-                      cursor: pointer;
-                      font-size: 14px;
-                      font-weight: bold;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      transition: all 0.2s;
-                      margin-right: 6px;
-                    `;
-                    resetBtn.onmouseover = () => {
-                      resetBtn.style.background = 'rgba(251, 191, 36, 0.5)';
-                      resetBtn.style.color = '#fff';
-                      resetBtn.style.transform = 'scale(1.1)';
-                    };
-                    resetBtn.onmouseout = () => {
-                      resetBtn.style.background = 'rgba(251, 191, 36, 0.3)';
-                      resetBtn.style.color = '#fbbf24';
-                      resetBtn.style.transform = 'scale(1)';
-                    };
-                    resetBtn.onclick = async () => {
-                      const shouldReset = await showConfirmDialog(
-                        "Reset Default Preset?",
-                        `Reset "${name}" to its original default settings?`,
-                        "Reset",
-                        "Cancel"
-                      );
-                      if (shouldReset) {
-                        // Restore original default preset
-                        presets[name] = JSON.parse(JSON.stringify(defaultPresets[name]));
-                        updateWidgetData();
-                        renderUI();
-                        updateNodeSize();
-                        showToast(`Preset "${name}" reset to default!`, "success", 2000);
-                      }
-                    };
-                    presetRow.appendChild(resetBtn);
-                  }
-                  
-                  presetRow.appendChild(loadBtn);
-                  presetWrapper.appendChild(presetRow);
-                }
+                   // Default preset - just add load button
+                   presetRow.appendChild(loadBtn);
+                   presetWrapper.appendChild(presetRow);
+                 }
 
                 parentContainer.appendChild(presetWrapper);
                 return presetWrapper;
+              } catch (error) {
+                console.error("[FlowPath] Error rendering preset row:", name, error);
+                return null;
+              }
             };
             
-            // DEFAULT PRESETS SUB-ACCORDION
-            const defaultPresetsHeader = document.createElement("div");
-            defaultPresetsHeader.style.cssText = `
-              display: flex;
-              align-items: center;
-              padding: 8px 10px;
-              background: rgba(255, 255, 255, 0.05);
-              border-radius: 6px;
-              margin-bottom: 8px;
-              cursor: pointer;
-              transition: all 0.2s;
-              border: 1px solid rgba(255, 255, 255, 0.1);
-            `;
-            defaultPresetsHeader.onmouseenter = () => {
-              defaultPresetsHeader.style.background = 'rgba(255, 255, 255, 0.08)';
-              defaultPresetsHeader.style.borderColor = theme.primaryLight;
-            };
-            defaultPresetsHeader.onmouseleave = () => {
-              defaultPresetsHeader.style.background = 'rgba(255, 255, 255, 0.05)';
-              defaultPresetsHeader.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-            };
-            
-            const defaultPresetsToggle = document.createElement("span");
-            defaultPresetsToggle.textContent = defaultPresetsExpanded ? "▼" : "▶";
-            defaultPresetsToggle.style.cssText = `
-              margin-right: 8px;
-              color: ${theme.accent};
-              font-size: 10px;
-            `;
-            
-            const defaultPresetsTitle = document.createElement("span");
-            defaultPresetsTitle.textContent = `⭐ Default Presets (${defaultPresetNames.length})`;
-            defaultPresetsTitle.style.cssText = `
-              flex: 1;
-              color: #fff;
-              font-size: 12px;
-              font-weight: 600;
-            `;
-            
-            defaultPresetsHeader.appendChild(defaultPresetsToggle);
-            defaultPresetsHeader.appendChild(defaultPresetsTitle);
-            defaultPresetsHeader.onclick = () => {
-              defaultPresetsExpanded = !defaultPresetsExpanded;
-              renderUI();
-              updateNodeSize();
-            };
-            presetsSection.content.appendChild(defaultPresetsHeader);
-            
-            if (defaultPresetsExpanded) {
-              const defaultPresetsContainer = document.createElement("div");
-              defaultPresetsContainer.style.cssText = `
-                margin-bottom: 12px;
-                padding-left: 8px;
+            // DEFAULT PRESETS SUB-ACCORDION (only show if not hidden in settings)
+            if (!globalSettings.hideDefaultPresets) {
+              const defaultPresetsHeader = document.createElement("div");
+              defaultPresetsHeader.style.cssText = `
+                display: flex;
+                align-items: center;
+                padding: 8px 10px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 6px;
+                margin-bottom: 8px;
+                cursor: pointer;
+                transition: all 0.2s;
+                border: 1px solid rgba(255, 255, 255, 0.1);
               `;
-              defaultPresetNames.forEach(name => {
-                renderPresetRow(name, true, defaultPresetsContainer);
-              });
-              presetsSection.content.appendChild(defaultPresetsContainer);
+              defaultPresetsHeader.onmouseenter = () => {
+                defaultPresetsHeader.style.background = 'rgba(255, 255, 255, 0.08)';
+                defaultPresetsHeader.style.borderColor = theme.primaryLight;
+              };
+              defaultPresetsHeader.onmouseleave = () => {
+                defaultPresetsHeader.style.background = 'rgba(255, 255, 255, 0.05)';
+                defaultPresetsHeader.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+              };
+              
+              const defaultPresetsToggle = document.createElement("span");
+              defaultPresetsToggle.textContent = defaultPresetsExpanded ? "▼" : "▶";
+              defaultPresetsToggle.style.cssText = `
+                margin-right: 8px;
+                color: ${theme.accent};
+                font-size: 10px;
+              `;
+              
+              const defaultPresetsTitle = document.createElement("span");
+              defaultPresetsTitle.textContent = `${emojiWithSpace('⭐')}Default Presets (${defaultPresetNames.length})`;
+              defaultPresetsTitle.style.cssText = `
+                flex: 1;
+                color: #fff;
+                font-size: 12px;
+                font-weight: 600;
+              `;
+              
+              defaultPresetsHeader.appendChild(defaultPresetsToggle);
+              defaultPresetsHeader.appendChild(defaultPresetsTitle);
+              defaultPresetsHeader.onclick = () => {
+                defaultPresetsExpanded = !defaultPresetsExpanded;
+                renderUI();
+                updateNodeSize();
+              };
+              presetsSection.content.appendChild(defaultPresetsHeader);
+              
+              if (defaultPresetsExpanded) {
+                const defaultPresetsContainer = document.createElement("div");
+                defaultPresetsContainer.style.cssText = `
+                  margin-bottom: 12px;
+                  padding-left: 8px;
+                `;
+                defaultPresetNames.forEach(name => {
+                  renderPresetRow(name, true, defaultPresetsContainer);
+                });
+                presetsSection.content.appendChild(defaultPresetsContainer);
+              }
             }
             
             // CUSTOM PRESETS SUB-ACCORDION
@@ -3380,7 +4708,7 @@ app.registerExtension({
             `;
             
             const customPresetsTitle = document.createElement("span");
-            customPresetsTitle.textContent = `✨ Custom Presets (${customPresetNames.length})`;
+            customPresetsTitle.textContent = `${emojiWithSpace('✨')}Custom Presets (${customPresetNames.length})`;
             customPresetsTitle.style.cssText = `
               flex: 1;
               color: #fff;
@@ -3408,6 +4736,74 @@ app.registerExtension({
                 customPresetNames.forEach(name => {
                   renderPresetRow(name, false, customPresetsContainer);
                 });
+                
+                // Add "Delete Selected" button (hidden by default)
+                const deleteSelectedBtn = document.createElement("button");
+                deleteSelectedBtn.className = "delete-selected-btn";
+                deleteSelectedBtn.textContent = "Delete Selected (0)";
+                deleteSelectedBtn.style.cssText = `
+                  display: none;
+                  align-items: center;
+                  justify-content: center;
+                  width: 100%;
+                  margin-top: 8px;
+                  padding: 8px 12px;
+                  background: rgba(239, 68, 68, 0.2);
+                  border: 1px solid rgba(239, 68, 68, 0.5);
+                  border-radius: 6px;
+                  color: rgba(239, 68, 68, 0.9);
+                  font-size: 12px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                `;
+                deleteSelectedBtn.onmouseover = () => {
+                  deleteSelectedBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+                  deleteSelectedBtn.style.borderColor = 'rgba(239, 68, 68, 0.7)';
+                  deleteSelectedBtn.style.color = '#fff';
+                };
+                deleteSelectedBtn.onmouseout = () => {
+                  deleteSelectedBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+                  deleteSelectedBtn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                  deleteSelectedBtn.style.color = 'rgba(239, 68, 68, 0.9)';
+                };
+                deleteSelectedBtn.onclick = async () => {
+                  if (selectedPresets.size === 0) return;
+                  
+                  const count = selectedPresets.size;
+                  const shouldDelete = await showConfirmDialog(
+                    "Delete Selected Presets?",
+                    `Are you sure you want to delete ${count} preset${count > 1 ? 's' : ''}?`,
+                    "Delete All",
+                    "Cancel"
+                  );
+                  
+                  if (shouldDelete) {
+                    const deletedNames = Array.from(selectedPresets);
+                    const currentGlobalPresets = loadGlobalPresets();
+                    
+                    deletedNames.forEach(presetName => {
+                      delete presets[presetName];
+                      if (currentGlobalPresets[presetName]) {
+                        delete currentGlobalPresets[presetName];
+                      }
+                      if (activePresetName === presetName) {
+                        activePresetName = null;
+                      }
+                    });
+                    
+                    saveGlobalPresets(currentGlobalPresets);
+                    updateWidgetData();
+                    renderUI();
+                    updateNodeSize();
+                    
+                    // Sync deletions to all other FlowPath nodes
+                    deletedNames.forEach(name => syncPresetsToAllNodes(null, name));
+                    
+                    showToast(`Deleted ${count} preset${count > 1 ? 's' : ''} successfully!`, "success", 2000);
+                  }
+                };
+                customPresetsContainer.appendChild(deleteSelectedBtn);
               } else {
                 const emptyMsg = document.createElement("div");
                 emptyMsg.textContent = "No custom presets yet";
@@ -3422,11 +4818,14 @@ app.registerExtension({
               }
               presetsSection.content.appendChild(customPresetsContainer);
             }
+           } catch (error) {
+            console.error("[FlowPath] Error rendering presets section:", error);
+           }
           }
 
           // Save Preset Button (always visible, outside accordion)
           const savePresetBtn = document.createElement("button");
-          savePresetBtn.textContent = "💾 Save Current as Preset";
+          savePresetBtn.textContent = `${emojiWithSpace('💾')}Save Current as Preset`;
           savePresetBtn.style.cssText = `
             width: 100%;
             padding: 8px;
@@ -3476,12 +4875,15 @@ app.registerExtension({
               }
             });
             
-            // Show warning if there are empty fields
-            if (emptyFields.length > 0) {
-              showToast(`Warning: Empty fields: ${emptyFields.join(", ")}`, "warning", 4000);
-            }
+            // Build warning message if there are empty fields
+            const warningMessage = emptyFields.length > 0 
+              ? `Empty fields: ${emptyFields.join(", ")}` 
+              : "";
             
-            const name = await showInputDialog("Enter Preset Name", "", "Example: Character Portrait");
+            const name = await showInputDialog("Enter Preset Name", "", "Example: Character Portrait", {
+              maxLength: 32,
+              warningMessage: warningMessage
+            });
             if (name) {
               // Check if this is a default preset - these cannot be overwritten
               const isDefaultPreset = defaultPresets.hasOwnProperty(name);
@@ -3657,7 +5059,6 @@ app.registerExtension({
         // Set initial size - user can resize as needed
         node.setSize([Math.max(node.size[0], 560), DEFAULT_HEIGHT + 40]);
         
-        console.log("[FlowPath] Custom widget added successfully!");
       });
     }
   }

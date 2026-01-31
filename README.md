@@ -11,15 +11,15 @@
 
 ### See It In Action
 
-**Full Demo** - UI, segments, auto-detection, filename builder, presets
+**Full Demo** - Segments, drag-and-drop, presets, click-to-copy, folder opening
 
-![FlowPath Demo](assets/flowpath-preview.gif)
+![FlowPath Demo](assets/demo-workflow.gif)
 
 [Watch full video](https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.mp4)
 
-**7 Beautiful Themes** - Find your style
+**7 Beautiful Themes** - Find your style (with emoji toggle!)
 
-![FlowPath Themes](assets/themes-preview.gif)
+![FlowPath Themes](assets/demo-themes.gif)
 
 [Watch full video](https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/themes.mp4)
 
@@ -33,6 +33,9 @@
 - 💾 **Global Presets** - Save once, use everywhere across all workflows
 - 📤 **Multi-Output Support** - Handle multiple outputs with Output Labels
 - 📝 **Dual Outputs** - Separate `path` and `filename` outputs for full Image Saver compatibility
+- 🔀 **SI/IS Mode Toggle** - Switch between Save Image and Image Saver output modes
+- 📋 **Click-to-Copy** - Click the path preview to copy to clipboard
+- 📂 **Quick Folder Access** - Shift+click to open output folder in file explorer
 
 ---
 
@@ -44,12 +47,16 @@
 | 🔍 **Auto-Detection** | Automatically detects Model, LoRA, Resolution, and Seed from your workflow |
 | ↕️ **Drag & Drop** | Reorder path segments with intuitive drag-and-drop |
 | 🎨 **7 Themes** | Ocean Blue, Forest Green, Pink Pony Club, Odie, Umbrael's Umbrage, Plain Jane, The Dark Knight |
-| 💾 **Smart Presets** | 4 defaults + unlimited custom presets with cross-workflow sync |
+| 💾 **Smart Presets** | 5 defaults + unlimited custom presets with cross-workflow sync |
 | 👁️ **Live Preview** | See your path and filename previews before generating |
 | 📡 **Wireless Support** | Works with Anything Everywhere for clean workflows |
 | 🔔 **Toast Notifications** | Visual feedback for all operations |
 | 📤 **Multi-Output** | Output Labels for handling multiple save nodes |
 | 📝 **Dual Outputs** | Separate `path` and `filename` outputs for Image Saver compatibility |
+| 🔀 **SI/IS Mode Toggle** | Switch between Save Image and Image Saver output formats instantly |
+| 📋 **Click-to-Copy** | Click the path preview to copy to clipboard (green flash feedback) |
+| 📂 **Quick Folder Access** | Shift+click preview to open folder in file explorer (creates if needed) |
+| 🎯 **Preset Multi-Select** | Shift+click for range selection and bulk delete of presets |
 
 ---
 
@@ -146,23 +153,45 @@ All workflows include explanatory notes to help you get started!
 
 FlowPath shows you exactly what your output will look like:
 
-**For Save Image (path output only):**
+### SI/IS Output Mode Toggle
+
+The Output Preview header includes a **SI/IS toggle switch** that instantly changes how FlowPath formats your output:
+
+| Mode | Full Name | Use With | Path Output | Filename Output |
+|------|-----------|----------|-------------|-----------------|
+| **SI** | Save Image | ComfyUI Save Image node | Path becomes filename prefix | Not used |
+| **IS** | Image Saver | Image Saver custom node | Folder path only | Separate filename pattern |
+
+**SI Mode (Save Image):**
 ```
 📁 path: Objects / Bottle / 2026-01-30_#####.[ext]
 ```
+The path becomes the filename prefix, and Save Image adds the counter.
 
-**For Image Saver (path + filename outputs):**
+**IS Mode (Image Saver):**
 ```
 📁 path: Objects / Bottle / 2026-01-30 /
 📝 filename: Bottle_%seed_##.[ext]
 Image Saver result: Objects / Bottle / 2026-01-30 / Bottle_%seed_##.[ext]
 ```
+The path is just the folder, filename is separate.
 
 **Understanding the preview:**
 - **`_#####`** - Save Image counter (5 digits): `_00001`, `_00002`, etc.
 - **`_##`** - Image Saver counter (2 digits): `_01`, `_02`, etc.
 - **`.[ext]`** - Extension placeholder (`.png`, `.jpg`, etc.) determined by your output node
-- When **filename** is set, **path** shows as folder only (with trailing `/`)
+- When in **IS mode**, the **📝 Filename** section controls your filename pattern
+
+### Click-to-Copy & Quick Folder Access
+
+The Output Preview is interactive:
+
+- **Click** the path preview to **copy the path** to your clipboard (green flash animation confirms)
+- **Shift+click** to **open the output folder** in your file explorer
+  - If the folder doesn't exist, FlowPath will ask if you want to create it
+  - In SI mode, FlowPath automatically determines the correct folder (strips filename prefix)
+  - If seed is the last segment, opens the parent folder (since seed changes each generation)
+  - The taskbar icon flashes if the folder window appears behind other apps (Windows limitation)
 
 **Pro Tip:** Expand the 📝 Filename section to control filenames for Image Saver!
 
@@ -336,10 +365,11 @@ The Filename section includes quick-insert buttons for all variables. Click a bu
 
 ### Default Presets (Always Available)
 
-1. **Simple Daily** - File Type + Category + Name + Date
-2. **Character Work** - File Type + Category + Name + Content Rating + Date
-3. **Project Organized** - File Type + Project + Category + Name + Date
-4. **Complete Metadata** - File Type + Category + Name + Date + Content Rating + Model + LoRA + Seed
+1. **Blank** - Clears all segments (starts fresh, preserves current SI/IS mode)
+2. **Simple Daily** - File Type + Category + Name + Date
+3. **Character Work** - File Type + Category + Name + Content Rating + Date
+4. **Project Organized** - File Type + Project + Category + Name + Date
+5. **Complete Metadata** - File Type + Category + Name + Date + Content Rating + Model + LoRA + Seed
 
 ### Custom Presets
 
@@ -349,6 +379,8 @@ The Filename section includes quick-insert buttons for all variables. Click a bu
 - **Global Storage** - Presets are saved globally and available across ALL workflows
 - **Auto-Sync** - Save or delete a preset in one node, and it syncs to all other FlowPath nodes in the same workflow
 - **Cross-Workflow Sync** - Open the Presets section to refresh and see presets from other workflows
+- **Multi-Select** - Shift+click to select a range of presets for bulk deletion
+- **Hide Default Presets** - Option in Settings to hide built-in presets if you only want your custom ones
 
 ---
 
@@ -380,6 +412,8 @@ Access via ComfyUI Settings → 🌊 FlowPath:
 - 🤖 **Auto-Detect Model** - Manual button only, or auto-detect on workflow load
 - 🎨 **Auto-Detect LoRA** - Enable/disable automatic LoRA detection
 - 📂 **LoRA Path Format** - Primary Only (Recommended), Primary + Count, All, Separate Folders
+- 🎭 **Hide Default Presets** - Hide built-in presets, show only your custom presets
+- ✨ **Preset Loading Animation** - Enable/disable the diagonal stripe animation when loading presets (shows toast notification when disabled)
 
 ---
 
@@ -498,28 +532,44 @@ See [Multi Output Example Workflow](examples/FlowPath%20Example%20T2I%20Workflow
 
 ### Using FlowPath with Image Saver nodes
 
-FlowPath has **dual outputs** for full compatibility with all saver nodes:
+FlowPath has **dual outputs** and a **SI/IS mode toggle** for full compatibility with all saver nodes:
+
+**SI/IS Mode Toggle:**
+- Look for the **SI | IS** toggle in the Output Preview header
+- **SI mode** (Save Image): Path becomes filename prefix
+- **IS mode** (Image Saver): Path is folder only, filename is separate
+- The toggle remembers your preference per node
 
 **Outputs:**
 - **path** - All segments joined (e.g., `Characters/Umbrael/2026-01-30`)
 - **filename** - Filename pattern from Filename section (e.g., `{name}_%seed`)
 
-**For Standard Save Image:**
+**For Standard Save Image (use SI mode):**
+- Click the **SI** button in the Output Preview header
 - Connect `path` → `filename_prefix`
 - Ignore the `filename` output
 - Result: `Characters/Umbrael/2026-01-30_00001.png`
 
-**For Image Saver:**
-1. Expand the **📝 Filename** section in FlowPath
-2. Build your filename pattern using variables
-3. Connect `path` → Image Saver's `path` input
-4. Connect `filename` → Image Saver's `filename` input
-5. Result: `Characters/Umbrael/2026-01-30/Umbrael_12345678.png`
+**For Image Saver (use IS mode):**
+1. Click the **IS** button in the Output Preview header
+2. Expand the **📝 Filename** section in FlowPath
+3. Build your filename pattern using variables
+4. Connect `path` → Image Saver's `path` input
+5. Connect `filename` → Image Saver's `filename` input
+6. Result: `Characters/Umbrael/2026-01-30/Umbrael_12345678.png`
 
 **Filename Variables:**
 - FlowPath: `{name}`, `{label}`, `{lora}`, `{model}`, `{category}`, etc.
 - Image Saver pass-through: `%seed`, `%time`, `%counter`, `%model`, etc.
 - Example: `{name}_%seed` or `{label}_%time_%seed`
+
+### Empty path showing "ComfyUI"
+
+If your path is empty (no segments enabled), FlowPath shows a default:
+- **SI mode**: Defaults to `ComfyUI` (so Save Image outputs to `output/ComfyUI_00001.png`)
+- **IS mode**: Defaults to empty (outputs to root `output/` folder)
+
+This prevents accidental saves to unexpected locations.
 
 ---
 

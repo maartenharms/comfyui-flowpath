@@ -5,6 +5,52 @@ All notable changes to FlowPath will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-01-31
+
+### Added
+
+#### SI/IS Output Mode Toggle
+- **New mode toggle** in Output Preview header - Switch between Save Image (SI) and Image Saver (IS) modes
+- **SI mode**: Path becomes filename prefix (for ComfyUI Save Image node)
+- **IS mode**: Path is folder only, filename is separate (for Image Saver custom node)
+- Mode preference is saved per node and persists across sessions
+
+#### Interactive Output Preview
+- **Click-to-copy** - Click the path preview to copy to clipboard with green flash animation feedback
+- **Shift+click to open folder** - Opens output folder in your file explorer
+  - Creates folder if it doesn't exist (with confirmation prompt)
+  - Smart handling for SI mode (strips filename prefix to determine actual folder)
+  - Smart handling for seed segment (if seed is last, opens parent folder since seed changes)
+
+#### Preset Improvements
+- **Blank preset** - New default preset that clears all segments while preserving SI/IS mode
+- **Preset multi-select** - Shift+click for range selection to bulk delete multiple presets
+- **Hide Default Presets setting** - Option to hide built-in presets and show only custom ones
+- **Preset loading animation setting** - Toggle the diagonal stripe animation (shows toast notification when disabled)
+
+#### New Node Defaults
+- **New nodes start blank** - Fresh FlowPath nodes now start with no segments enabled (matching Blank preset)
+- Users can quickly load a preset or add segments manually
+
+### Changed
+- **Folder opening improved** - Uses window blur trick to reliably bring Explorer to front (bypasses Windows focus-stealing prevention)
+- Empty path now defaults to `ComfyUI` in SI mode (prevents saves to unexpected locations)
+- Empty path defaults to empty string in IS mode (outputs to root folder)
+- Standardized input backgrounds with dark gradients across all 7 themes
+- Output Preview uses theme colors for both sticky and non-sticky modes
+- Settings now have clean human-readable IDs (removed numeric prefixes)
+- Auto-detect immediately re-renders UI (fixes segment row not updating bug)
+
+### Fixed
+- SI/IS switch background no longer disappears when toggling
+- Consistent styling across all theme gradient backgrounds
+
+### Code Quality
+- Removed 84 debug console.log statements from JavaScript (kept only version message)
+- Single startup message: `FlowPath v1.2.0 loaded`
+
+---
+
 ## [1.1.1] - 2026-01-31
 
 ### Fixed

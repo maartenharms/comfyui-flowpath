@@ -309,7 +309,11 @@ class FlowPath:
         if path_parts:
             final_path = os.path.join(*path_parts)
         else:
-            final_path = ""
+            # Default depends on output mode:
+            # SI mode (saveImage): "ComfyUI" becomes filename prefix
+            # IS mode (imageSaver): empty string (uses output folder directly)
+            output_mode = config.get("output_mode", "saveImage")
+            final_path = "ComfyUI" if output_mode == "saveImage" else ""
 
         print(f"[FlowPath] Path parts: {path_parts}")
         print(f"[FlowPath] Final path: {final_path}")
