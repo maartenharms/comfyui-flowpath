@@ -100,6 +100,36 @@ Objects/Bottle/2026-01-30/Bottle_12345678_01.png
 
 ---
 
+### 5. **FlowPath Example T2I Workflow (SamplerCustomAdvanced).json**
+**Seed Detection with SamplerCustomAdvanced**
+
+This workflow demonstrates FlowPath's seed detection with the advanced sampling workflow:
+- Uses `SamplerCustomAdvanced` instead of `KSampler`
+- Shows seed detection from `RandomNoise` node
+- Perfect for testing FlowPath with advanced/Flux-style workflows
+
+**How it works:**
+1. `RandomNoise` node generates noise with a `noise_seed`
+2. FlowPath detects the seed from the `RandomNoise` node (not the sampler)
+3. The seed is included in your output path
+
+**Nodes included:**
+- `CheckpointLoaderSimple` - Loads model, VAE, CLIP
+- `RandomNoise` - Generates noise with seed (FlowPath detects this!)
+- `BasicGuider` + `KSamplerSelect` + `BasicScheduler`
+- `SamplerCustomAdvanced` - Advanced sampler
+- `FlowPath` - With Seed segment enabled
+- `SaveImage` - Saves with organized path
+
+**Example Output:**
+```
+Test/SeedTest/123456789/2026-01-31_00001.png
+```
+
+**Note:** You may need to change the checkpoint to one you have installed.
+
+---
+
 ## 🚀 Getting Started
 
 1. Download one of the example workflows
@@ -116,6 +146,7 @@ Objects/Bottle/2026-01-30/Bottle_12345678_01.png
 - **Use the wireless workflow** when you have complex canvases with many nodes
 - **Use the multi-output workflow** when you need to save multiple versions of the same image
 - **Use the Image Saver workflow** if you want full control over filenames with Image Saver
+- **Use the SamplerCustomAdvanced workflow** for Flux-style or advanced sampling setups
 - **Customize the segments** in FlowPath to match your personal workflow
 - **Experiment with different segment orders** to find what works best for you
 - **Save presets** to quickly apply your favorite configurations across all workflows

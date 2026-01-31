@@ -5,6 +5,16 @@ All notable changes to FlowPath will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-01-31
+
+### Fixed
+- **Seed detection for SamplerCustomAdvanced workflows** - Now detects seeds from `RandomNoise` and `DisableNoise` nodes which use `noise_seed` instead of `seed`
+
+### Added
+- **New example workflow** - `FlowPath Example T2I Workflow (SamplerCustomAdvanced).json` for testing seed detection with advanced samplers
+
+---
+
 ## [1.1.0] - 2026-01-30
 
 ### Added
@@ -109,7 +119,7 @@ Example: `{name}_%seed` → `Umbrael_12345678`
 
 ### Documentation
 - Comprehensive README with all features documented
-- 4 example workflows (Basic, Wireless, Multi-Output, Image Saver)
+- 5 example workflows (Basic, Wireless, Multi-Output, Image Saver, SamplerCustomAdvanced)
 - Troubleshooting guide
 
 ---
