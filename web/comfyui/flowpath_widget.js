@@ -941,12 +941,67 @@ app.registerExtension({
 
         // UI state
         let draggedIndex = null;
+        let segmentsContentEl = null;
         let configExpanded = true;
         let segmentsExpanded = true;
         let filenameExpanded = false;  // Filename section collapsed by default (for Image Saver users)
         let presetsExpanded = false;
         let defaultPresetsExpanded = true;  // Sub-accordion for default presets
         let customPresetsExpanded = true;   // Sub-accordion for custom presets
+
+        document.addEventListener('dragover', (e) => {
+          if (draggedIndex === null) return;
+          if (!segmentsContentEl) return;
+
+          const rect = segmentsContentEl.getBoundingClientRect();
+          const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+          if (!inside) return;
+
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+          e.preventDefault();
+        }, true);
+
+        document.addEventListener('drop', (e) => {
+          if (draggedIndex === null) return;
+          if (!segmentsContentEl) return;
+
+          // If the drop target is inside the list, row/container handlers will take care of it.
+          if (e.target && segmentsContentEl.contains(e.target)) return;
+
+          const rect = segmentsContentEl.getBoundingClientRect();
+          const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+          if (!inside) return;
+
+          e.preventDefault();
+
+          const rowElements = Array.from(segmentsContentEl.querySelectorAll('[data-index]'));
+          if (rowElements.length === 0) return;
+
+          let insertIndex = rowElements.length;
+          for (const rowEl of rowElements) {
+            const idx = parseInt(rowEl.dataset.index, 10);
+            if (Number.isNaN(idx)) continue;
+
+            const r = rowEl.getBoundingClientRect();
+            const midpoint = r.top + r.height / 2;
+            if (e.clientY < midpoint) {
+              insertIndex = idx;
+              break;
+            }
+          }
+
+          const [movedItem] = segments.splice(draggedIndex, 1);
+          if (insertIndex > draggedIndex) insertIndex -= 1;
+          segments.splice(insertIndex, 0, movedItem);
+
+          console.log("[FlowPath] Segments reordered from index", draggedIndex, "to", insertIndex);
+          console.log("[FlowPath] New segment order:", segments.map(s => s.type).join(', '));
+
+          activePresetName = null;
+          updateWidgetData();
+          renderUI();
+          updateNodeSize();
+        }, true);
 
         // Get current theme from global settings
         const getTheme = () => THEMES[globalSettings.theme] || THEMES.umbrael;
@@ -1587,6 +1642,61 @@ app.registerExtension({
           container.appendChild(segmentsSection.section);
 
           if (segmentsExpanded) {
+            segmentsContentEl = segmentsSection.content;
+
+            const onSegmentsDragEnter = (e) => {
+              if (draggedIndex === null) return;
+              e.preventDefault();
+              e.stopPropagation();
+            };
+
+            const onSegmentsDragOver = (e) => {
+              if (draggedIndex === null) return;
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = 'move';
+            };
+
+            const onSegmentsDrop = (e) => {
+              if (draggedIndex === null) return;
+              e.preventDefault();
+              e.stopPropagation();
+
+              const rowElements = Array.from(segmentsSection.content.querySelectorAll('[data-index]'));
+              if (rowElements.length === 0) return;
+
+              let insertIndex = rowElements.length;
+              for (const rowEl of rowElements) {
+                const idx = parseInt(rowEl.dataset.index, 10);
+                if (Number.isNaN(idx)) continue;
+
+                const rect = rowEl.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+
+                if (e.clientY < midpoint) {
+                  insertIndex = idx;
+                  break;
+                }
+              }
+
+              const [movedItem] = segments.splice(draggedIndex, 1);
+              if (insertIndex > draggedIndex) insertIndex -= 1;
+              segments.splice(insertIndex, 0, movedItem);
+
+              console.log("[FlowPath] Segments reordered from index", draggedIndex, "to", insertIndex);
+              console.log("[FlowPath] New segment order:", segments.map(s => s.type).join(', '));
+
+              activePresetName = null;
+              updateWidgetData();
+              renderUI();
+              updateNodeSize();
+            };
+
+            // Use capture phase: ComfyUI/LiteGraph may intercept drag events on bubble phase.
+            segmentsSection.content.addEventListener('dragenter', onSegmentsDragEnter, { capture: true });
+            segmentsSection.content.addEventListener('dragover', onSegmentsDragOver, { capture: true });
+            segmentsSection.content.addEventListener('drop', onSegmentsDrop, { capture: true });
+
             segments.forEach((segment, index) => {
               const segInfo = SEGMENT_TYPES[segment.type] || { icon: "❓", label: segment.type };
               
@@ -1642,6 +1752,8 @@ app.registerExtension({
                 draggedIndex = index;
                 row.style.opacity = '0.5';
                 e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(index));
+                e.stopPropagation();
               });
 
               // Track drop position (before or after current row)
@@ -1655,10 +1767,19 @@ app.registerExtension({
                   el.style.borderTop = '';
                   el.style.borderBottom = '';
                 });
+                e.stopPropagation();
               });
+
+              row.addEventListener('dragenter', (e) => {
+                if (draggedIndex === null) return;
+                e.preventDefault();
+                e.stopPropagation();
+              }, { capture: true });
 
               row.addEventListener('dragover', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
                 if (draggedIndex !== null && draggedIndex !== index) {
                   // Determine if we're in the top or bottom half of the row
                   const rect = row.getBoundingClientRect();
@@ -1681,16 +1802,18 @@ app.registerExtension({
                     dropPosition = 'after';
                   }
                 }
-              });
+              }, { capture: true });
 
               row.addEventListener('dragleave', (e) => {
                 row.classList.remove('gensort-drag-over');
                 row.style.borderTop = '';
                 row.style.borderBottom = '';
+                e.stopPropagation();
               });
 
               row.addEventListener('drop', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 row.classList.remove('gensort-drag-over');
                 row.style.borderTop = '';
                 row.style.borderBottom = '';
@@ -1719,7 +1842,7 @@ app.registerExtension({
                   renderUI();
                   updateNodeSize();
                 }
-              });
+              }, { capture: true });
 
               const dragHandle = document.createElement("span");
               dragHandle.textContent = "⋮⋮";
@@ -1923,6 +2046,8 @@ app.registerExtension({
 
             addSegmentContainer.appendChild(addSelect);
             segmentsSection.content.appendChild(addSegmentContainer);
+          } else {
+            segmentsContentEl = null;
           }
 
           // CONFIGURATION SECTION
