@@ -1639,20 +1639,15 @@ app.registerExtension({
               };
 
               row.addEventListener('dragstart', (e) => {
-                console.log("[FlowPath] DRAG START - index:", index, "segment:", segment.type);
-                e.stopPropagation(); // Prevent LiteGraph from handling this
                 draggedIndex = index;
                 row.style.opacity = '0.5';
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', index.toString()); // Required for Firefox
               });
 
               // Track drop position (before or after current row)
               let dropPosition = 'after';
 
               row.addEventListener('dragend', (e) => {
-                console.log("[FlowPath] DRAG END");
-                e.stopPropagation(); // Prevent LiteGraph from handling this
                 row.style.opacity = '1';
                 draggedIndex = null;
                 container.querySelectorAll('.gensort-drag-over').forEach(el => {
@@ -1664,10 +1659,7 @@ app.registerExtension({
 
               row.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                e.stopPropagation(); // Prevent LiteGraph from handling this
-                e.dataTransfer.dropEffect = 'move'; // Show move cursor
                 if (draggedIndex !== null && draggedIndex !== index) {
-                  console.log("[FlowPath] DRAG OVER - target index:", index, "dragged index:", draggedIndex);
                   // Determine if we're in the top or bottom half of the row
                   const rect = row.getBoundingClientRect();
                   const midpoint = rect.top + rect.height / 2;
@@ -1699,8 +1691,6 @@ app.registerExtension({
 
               row.addEventListener('drop', (e) => {
                 e.preventDefault();
-                e.stopPropagation(); // Prevent LiteGraph from handling this
-                console.log("[FlowPath] DROP - on index:", index, "from draggedIndex:", draggedIndex, "dropPosition:", dropPosition);
                 row.classList.remove('gensort-drag-over');
                 row.style.borderTop = '';
                 row.style.borderBottom = '';
