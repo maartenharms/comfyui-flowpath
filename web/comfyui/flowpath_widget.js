@@ -1566,6 +1566,48 @@ app.registerExtension({
           container.appendChild(segmentsSection.section);
 
           if (segmentsExpanded) {
+            segmentsSection.content.addEventListener('dragover', (e) => {
+              if (draggedIndex === null) return;
+              e.preventDefault();
+              e.stopPropagation();
+              e.dataTransfer.dropEffect = 'move';
+            });
+
+            segmentsSection.content.addEventListener('drop', (e) => {
+              if (draggedIndex === null) return;
+              e.preventDefault();
+              e.stopPropagation();
+
+              const rowElements = Array.from(segmentsSection.content.querySelectorAll('[data-index]'));
+              if (rowElements.length === 0) return;
+
+              let insertIndex = rowElements.length;
+              for (const rowEl of rowElements) {
+                const idx = parseInt(rowEl.dataset.index, 10);
+                if (Number.isNaN(idx)) continue;
+
+                const rect = rowEl.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+
+                if (e.clientY < midpoint) {
+                  insertIndex = idx;
+                  break;
+                }
+              }
+
+              const [movedItem] = segments.splice(draggedIndex, 1);
+              if (insertIndex > draggedIndex) insertIndex -= 1;
+              segments.splice(insertIndex, 0, movedItem);
+
+              console.log("[FlowPath] Segments reordered from index", draggedIndex, "to", insertIndex);
+              console.log("[FlowPath] New segment order:", segments.map(s => s.type).join(', '));
+
+              activePresetName = null;
+              updateWidgetData();
+              renderUI();
+              updateNodeSize();
+            });
+
             segments.forEach((segment, index) => {
               const segInfo = SEGMENT_TYPES[segment.type] || { icon: "❓", label: segment.type };
               
@@ -1621,6 +1663,8 @@ app.registerExtension({
                 draggedIndex = index;
                 row.style.opacity = '0.5';
                 e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(index));
+                e.stopPropagation();
               });
 
               // Track drop position (before or after current row)
@@ -1634,10 +1678,13 @@ app.registerExtension({
                   el.style.borderTop = '';
                   el.style.borderBottom = '';
                 });
+                e.stopPropagation();
               });
 
               row.addEventListener('dragover', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
                 if (draggedIndex !== null && draggedIndex !== index) {
                   // Determine if we're in the top or bottom half of the row
                   const rect = row.getBoundingClientRect();
@@ -1666,10 +1713,12 @@ app.registerExtension({
                 row.classList.remove('gensort-drag-over');
                 row.style.borderTop = '';
                 row.style.borderBottom = '';
+                e.stopPropagation();
               });
 
               row.addEventListener('drop', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 row.classList.remove('gensort-drag-over');
                 row.style.borderTop = '';
                 row.style.borderBottom = '';
