@@ -352,6 +352,13 @@ class FlowPath:
                 "Seed Generator",  # ComfyUI-Image-Saver
             ]
 
+            # Noise generator nodes (for SamplerCustomAdvanced workflows)
+            # These nodes generate noise with a seed that we can detect
+            noise_generator_types = [
+                "RandomNoise",  # Standard ComfyUI noise node
+                "DisableNoise",  # Has noise_seed
+            ]
+
             sampler_types = [
                 "KSampler",
                 "KSamplerAdvanced",
@@ -394,7 +401,37 @@ class FlowPath:
                         # Prepend with priority marker (0 = highest priority)
                         detected_seeds.append((0, node_id, seed, class_type))
 
-                # Priority 2: Check for sampler nodes (fallback)
+                # Priority 2: Check for noise generator nodes (for SamplerCustomAdvanced)
+                elif any(
+                    noise_type in class_type for noise_type in noise_generator_types
+                ):
+                    inputs = node_data.get("inputs", {})
+                    print(
+                        f"[FlowPath] Found noise generator node {node_id} ({class_type})"
+                    )
+                    print(f"[FlowPath] Inputs: {inputs}")
+
+                    # Noise generators use "noise_seed" instead of "seed"
+                    seed = inputs.get("noise_seed")
+                    if seed is not None:
+                        # Handle both single values and arrays [seed, batch_index]
+                        original_seed = seed
+                        if isinstance(seed, (list, tuple)):
+                            seed = seed[0]  # Extract actual seed value
+
+                        # Try to convert to int if it's a string
+                        try:
+                            seed = int(seed)
+                        except (ValueError, TypeError):
+                            pass
+
+                        print(
+                            f"[FlowPath] Found noise_seed in {class_type} node {node_id}: {seed} (original: {original_seed})"
+                        )
+                        # Priority 1 (between seed generators and samplers)
+                        detected_seeds.append((1, node_id, seed, class_type))
+
+                # Priority 3: Check for sampler nodes (fallback)
                 elif any(sampler_type in class_type for sampler_type in sampler_types):
                     inputs = node_data.get("inputs", {})
                     print(f"[FlowPath] Found sampler node {node_id} ({class_type})")
@@ -417,8 +454,8 @@ class FlowPath:
                         print(
                             f"[FlowPath] Found seed in {class_type} node {node_id}: {seed} (original: {original_seed})"
                         )
-                        # Append with lower priority (1 = lower priority)
-                        detected_seeds.append((1, node_id, seed, class_type))
+                        # Append with lower priority (2 = lowest priority)
+                        detected_seeds.append((2, node_id, seed, class_type))
 
             # Log all detected seeds
             if detected_seeds:

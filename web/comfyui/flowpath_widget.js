@@ -279,10 +279,31 @@ function detectSeedFromWorkflow(graph) {
     "KSampler",
     "KSamplerAdvanced",
     "SamplerCustom",
-    "KSampler (Efficient)"
+    "KSampler (Efficient)",
+    "SamplerCustomAdvanced"
+  ];
+  
+  // Noise generator nodes (for SamplerCustomAdvanced workflows)
+  const noiseGeneratorTypes = [
+    "RandomNoise",
+    "DisableNoise"
   ];
 
-  // Search for sampler nodes
+  // First, check for noise generator nodes (higher priority for SamplerCustomAdvanced workflows)
+  for (const node of graph._nodes) {
+    if (noiseGeneratorTypes.some(type => node.type.includes(type) || type.includes(node.type))) {
+      // Find the widget that contains the noise_seed
+      const seedWidget = node.widgets?.find(w => w.name === "noise_seed");
+      
+      if (seedWidget && seedWidget.value !== undefined && seedWidget.value !== null) {
+        const seed = String(seedWidget.value);
+        console.log("[FlowPath] Detected noise_seed from", node.type, ":", seed);
+        return seed;
+      }
+    }
+  }
+
+  // Search for sampler nodes (fallback)
   for (const node of graph._nodes) {
     if (samplerNodeTypes.some(type => node.type.includes(type) || type.includes(node.type))) {
       // Find the widget that contains the seed
@@ -296,7 +317,7 @@ function detectSeedFromWorkflow(graph) {
     }
   }
 
-  console.log("[FlowPath] No sampler node with seed found in workflow");
+  console.log("[FlowPath] No sampler or noise generator node with seed found in workflow");
   return null;
 }
 
