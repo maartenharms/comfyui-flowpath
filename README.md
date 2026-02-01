@@ -139,6 +139,7 @@ Check out the [examples folder](examples/) for ready-to-use workflows:
 - **FlowPath Example T2I Workflow (Wireless).json** - Advanced wireless setup
 - **FlowPath Example T2I Workflow (Multi Output).json** - Multiple outputs with Output Labels
 - **FlowPath Example T2I Workflow (Image Saver).json** - Image Saver with dual outputs
+- **FlowPath Example T2I Workflow (SamplerCustomAdvanced).json** - Advanced sampler with seed detection
 
 All workflows include explanatory notes to help you get started!
 
