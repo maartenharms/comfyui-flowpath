@@ -804,7 +804,9 @@ app.registerExtension({
         }
 
         let segments = currentData.segments || defaultSegments;
-        let config = currentData.config || {
+        
+        // Default config - used for new nodes and as fallback for missing fields
+        const defaultConfig = {
           node_label: "", // Label to identify this FlowPath node when using multiple
           file_type: "Image",
           category: "Characters",
@@ -821,10 +823,8 @@ app.registerExtension({
           // seed is NOT stored in config - always detected dynamically from KSampler
         };
         
-        // Ensure output_mode has a default for old workflows that don't have it
-        if (!config.output_mode) {
-          config.output_mode = "saveImage";
-        }
+        // Merge loaded config with defaults to ensure all fields exist (backward compatibility)
+        let config = { ...defaultConfig, ...(currentData.config || {}) };
         
         // Default presets for common use cases
           const defaultPresets = {
