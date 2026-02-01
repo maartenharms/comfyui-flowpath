@@ -23,6 +23,7 @@
 
 **FlowPath** is a **free and open source** ComfyUI custom node that intelligently organizes your AI-generated images. Say goodbye to messy output folders!
 
+- 🔢 **A1111-Style Counter** - `{counter}` scans folders and auto-increments (0001, 0002, 0003...)
 - 🎯 **Template Variables** - `{model}`, `{lora}`, `{seed}`, `{date}` and more
 - 🔍 **Auto-Detection** - Automatically detects Model, LoRA, Resolution, Seed
 - 🎨 **7 Beautiful Themes** - Customize the look to match your style
@@ -39,6 +40,7 @@
 
 | Feature | Description |
 |---------|-------------|
+| 🔢 **A1111-Style Counter** | `{counter}` scans folders for existing files and auto-increments (persists across restarts!) |
 | 🎯 **Template Variables** | Use `{model}`, `{lora}`, `{resolution}`, `{date}`, `{label}` in custom folders |
 | 🔍 **Auto-Detection** | Automatically detects Model, LoRA, Resolution, and Seed from your workflow |
 | ↕️ **Drag & Drop** | Reorder path segments with intuitive drag-and-drop |
@@ -221,6 +223,7 @@ Use variables in **Custom Segments** to create dynamic paths:
 ### Available Variables
 
 ```javascript
+{counter}          // A1111-style sequential number (0001, 0002, 0003...)
 {filetype}         // Image, Video, etc.
 {file_type}        // Alias for filetype
 {category}         // Characters, Locations, etc.
@@ -274,6 +277,7 @@ FlowPath's **Filename** section lets you build custom filename patterns for full
 The filename output supports two types of variables:
 
 **FlowPath Variables** (processed by FlowPath):
+- `{counter}` - **A1111-style sequential numbering** (scans folder, persists across restarts)
 - `{name}` - Subject name
 - `{label}` - Output label
 - `{lora}` - LoRA name
@@ -294,18 +298,35 @@ The filename output supports two types of variables:
 ### Example Filename Patterns
 
 ```
+{counter}_{name}
+→ 0001_Umbrael, 0002_Umbrael, 0003_Umbrael...
+
+{counter}_{name}_%seed
+→ 0001_Umbrael_12345678
+
 {name}_%seed
 → Umbrael_12345678
 
 {label}_%time_%seed
 → Upscaled_2026-01-30-143052_12345678
 
-{lora}_%counter
-→ Umbrael_Prime_Illustrious_V1_00001
-
 {category}_{name}_%seed
 → Characters_Umbrael_12345678
 ```
+
+### 🔢 The `{counter}` Variable
+
+The `{counter}` variable provides **A1111-style sequential numbering**:
+
+- **Scans the output folder** for existing files matching your pattern
+- **Finds the next available number** automatically
+- **Zero-padded to 4 digits**: 0001, 0002, 0003...
+- **Persists across restarts** - no session tracking needed!
+- **Works with Image Saver `%variables`** in the same pattern
+
+**Example:** If your folder has `0042_Umbrael.png`, the next file will be `0043_Umbrael.png`.
+
+**Pro Tip:** Put `{counter}` first for proper file manager sorting: `{counter}_{name}_%seed`
 
 ### Quick-Insert Buttons
 
