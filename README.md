@@ -15,13 +15,9 @@
 
 ![FlowPath Demo](assets/demo-workflow.gif)
 
-[Watch full video](https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/flowpath-demo.mp4)
-
 **7 Beautiful Themes** - Find your style (with emoji toggle!)
 
 ![FlowPath Themes](assets/demo-themes.gif)
-
-[Watch full video](https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/themes.mp4)
 
 ---
 
@@ -95,9 +91,6 @@ Then restart ComfyUI.
 ## 🔌 Connection Methods
 
 ### Method 1: Direct Connection (Recommended for Beginners)
-
-<!-- Video: Connecting FlowPath to Save Image + presets -->
-https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/connection-presets.mp4
 
 The simplest way to use FlowPath:
 
@@ -386,10 +379,7 @@ The Filename section includes quick-insert buttons for all variables. Click a bu
 
 ## 🎨 Themes
 
-<!-- Video: Theme switching -->
-https://github.com/maartenharms/comfyui-flowpath/raw/main/assets/themes.mp4
-
-Choose from **6 beautiful themes** in Settings → FlowPath → Theme:
+Choose from **7 beautiful themes** in Settings → FlowPath → Theme:
 
 | Theme | Primary | Accent | Vibe |
 |-------|---------|--------|------|
