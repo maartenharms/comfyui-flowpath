@@ -1202,16 +1202,26 @@ app.registerExtension({
         const getTheme = () => THEMES[globalSettings.theme] || THEMES.umbrael;
 
         // Template variable replacement function
-        const replaceTemplateVars = (template, showPlaceholders = true) => {
+        // showPlaceholders: true = show [placeholder], false = show empty string
+        // highlightEmpty: true = show empty vars in red HTML (for output preview)
+        const replaceTemplateVars = (template, showPlaceholders = true, highlightEmpty = false) => {
           if (!template || typeof template !== 'string') return template;
+          
+          // Track which variables are empty for highlighting
+          const emptyVars = new Set();
           
           // Define available variables - show placeholder text when empty if showPlaceholders is true
           const getVal = (value, placeholder) => {
             if (value && value.trim()) return value;
+            emptyVars.add(placeholder);
+            if (highlightEmpty) {
+              return `<span style="color: #ef4444; font-style: italic;">[${placeholder}]</span>`;
+            }
             return showPlaceholders ? `[${placeholder}]` : "";
           };
           
           const vars = {
+            counter: "####", // Preview placeholder - actual value calculated by scanning folder at runtime
             label: getVal(config.node_label, "label"),
             output: getVal(config.node_label, "label"), // Alias
             filetype: config.file_type || "Image",
@@ -1229,10 +1239,10 @@ app.registerExtension({
             model: getVal(config.model_name, "model"),
             lora: getVal(config.lora_name, "lora"),
             seed: "[seed-auto]", // Seed is always dynamic
-            date: "2026-01-30", // Preview date
-            year: "2026",
-            month: "01",
-            day: "30"
+            date: new Date().toISOString().split('T')[0], // Actual current date
+            year: new Date().getFullYear().toString(),
+            month: String(new Date().getMonth() + 1).padStart(2, '0'),
+            day: String(new Date().getDate()).padStart(2, '0')
           };
           
           // Replace {variable} with actual values
@@ -2017,7 +2027,8 @@ app.registerExtension({
             const hasFilenameTemplate = config.filename_template && config.filename_template.trim();
             let filenamePreviewStr = "";
             if (hasFilenameTemplate) {
-              filenamePreviewStr = replaceTemplateVars(config.filename_template, true);
+              // Use highlightEmpty=true to show empty variables in red in output preview
+              filenamePreviewStr = replaceTemplateVars(config.filename_template, false, true);
             }
             
             // Split path into segments for breadcrumb display, always start with "output/"
@@ -2090,8 +2101,12 @@ app.registerExtension({
             
             if (isImageSaverMode) {
               // Image Saver mode: Show path and filename merged
+              // Don't show _## if user already has %counter or {counter} in their template
+              const hasCounter = config.filename_template && 
+                (config.filename_template.includes('%counter') || config.filename_template.toLowerCase().includes('{counter}'));
+              const counterSuffix = hasCounter ? '.[ext]' : '_##.[ext]';
               const filenameDisplay = hasFilenameTemplate 
-                ? `<span style="color: #fff; font-weight: 600;">${filenamePreviewStr || config.filename_template}</span><span style="color: rgba(255,255,255,0.3);">_##.[ext]</span>`
+                ? `<span style="color: #fff; font-weight: 600;">${filenamePreviewStr || config.filename_template}</span><span style="color: rgba(255,255,255,0.3);">${counterSuffix}</span>`
                 : `<span style="color: rgba(255,255,255,0.4); font-style: italic;">&lt;filename&gt;</span><span style="color: rgba(255,255,255,0.3);">_##.[ext]</span>`;
               
               html += `<div class="path-string-container" style="
@@ -3865,8 +3880,91 @@ app.registerExtension({
               position: relative;
               z-index: 1;
             `;
-            filenameWarningText.textContent = "⚠️ 1 empty";
-            filenameWarningText.title = "Filename pattern is empty";
+            // Helper to count empty variables in filename template
+            const countEmptyVarsInFilename = () => {
+              const template = config.filename_template || "";
+              if (!template) return { isEmpty: true, emptyVars: 0 };
+              
+              const varMappings = {
+                '{name}': config.name,
+                '{label}': config.node_label,
+                '{lora}': config.lora_name,
+                '{model}': config.model_name,
+                '{category}': config.category,
+                '{resolution}': config.resolution,
+                // {counter} and {date} are always available
+              };
+              
+              let emptyCount = 0;
+              for (const [varName, value] of Object.entries(varMappings)) {
+                if (template.toLowerCase().includes(varName) && (!value || !value.trim())) {
+                  emptyCount++;
+                }
+              }
+              return { isEmpty: false, emptyVars: emptyCount };
+            };
+            
+            // Helper to update filename warning state
+            // Gradient definitions for warnings
+            const redGradient = 'linear-gradient(90deg, rgba(153, 27, 27, 0.8) 0%, rgba(220, 38, 38, 0.7) 50%, rgba(239, 68, 68, 0.8) 100%)';
+            const yellowGradient = 'linear-gradient(90deg, rgba(133, 100, 4, 0.8) 0%, rgba(180, 140, 20, 0.7) 50%, rgba(250, 204, 21, 0.8) 100%)';
+            
+            const updateFilenameWarning = () => {
+              const { isEmpty, emptyVars } = countEmptyVarsInFilename();
+              const templateEmpty = !config.filename_template || !config.filename_template.trim();
+              const templateLower = (config.filename_template || "").toLowerCase();
+              const hasCounter = templateLower.includes('{counter}');
+              const hasTime = templateLower.includes('%time');
+              const hasCounterAndTime = hasCounter && hasTime;
+              
+              const hasRedWarning = templateEmpty || emptyVars > 0;
+              const hasYellowWarning = hasCounterAndTime && !hasRedWarning;
+              const hasWarning = hasRedWarning || hasYellowWarning;
+              
+              filenameWarningOverlay.style.opacity = hasWarning ? '1' : '0';
+              filenameWarningOverlay.style.background = hasRedWarning ? redGradient : yellowGradient;
+              filenameWarningText.style.display = hasWarning ? 'inline-block' : 'none';
+              filenameWarningText.style.color = 'rgba(255, 255, 255, 0.9)';
+              
+              if (templateEmpty) {
+                filenameWarningText.textContent = "⚠️ empty";
+                filenameWarningText.title = "Filename pattern is empty";
+              } else if (emptyVars > 0) {
+                filenameWarningText.textContent = `⚠️ ${emptyVars} empty var${emptyVars > 1 ? 's' : ''}`;
+                filenameWarningText.title = `${emptyVars} variable${emptyVars > 1 ? 's' : ''} in pattern ${emptyVars > 1 ? 'have' : 'has'} no value set`;
+              } else if (hasCounterAndTime) {
+                filenameWarningText.textContent = "⚠️ redundant";
+                filenameWarningText.title = "Both {counter} and %time provide uniqueness. Counter may not increment reliably when combined with %time.";
+              }
+              
+              const borderColor = hasRedWarning ? 'rgba(239, 68, 68, 0.8)' : (hasYellowWarning ? 'rgba(250, 204, 21, 0.6)' : theme.primaryLight);
+              filenameSection.header.style.borderColor = borderColor;
+            };
+            
+            const { isEmpty: initialIsEmpty, emptyVars: initialEmptyVars } = countEmptyVarsInFilename();
+            const initialTemplateLower = (config.filename_template || "").toLowerCase();
+            const initialHasCounter = initialTemplateLower.includes('{counter}');
+            const initialHasTime = initialTemplateLower.includes('%time');
+            const initialHasCounterAndTime = initialHasCounter && initialHasTime;
+            const initialHasRedWarning = isFilenameEmpty || initialEmptyVars > 0;
+            const initialHasYellowWarning = initialHasCounterAndTime && !initialHasRedWarning;
+            const initialHasWarning = initialHasRedWarning || initialHasYellowWarning;
+            // Update initial display state to include warnings
+            filenameWarningOverlay.style.opacity = initialHasWarning ? '1' : '0';
+            filenameWarningOverlay.style.background = initialHasRedWarning ? redGradient : yellowGradient;
+            filenameWarningText.style.display = initialHasWarning ? 'inline-block' : 'none';
+            filenameWarningText.style.color = 'rgba(255, 255, 255, 0.9)';
+            filenameSection.header.style.borderColor = initialHasRedWarning ? 'rgba(239, 68, 68, 0.8)' : (initialHasYellowWarning ? 'rgba(250, 204, 21, 0.6)' : theme.primaryLight);
+            if (isFilenameEmpty) {
+              filenameWarningText.textContent = "⚠️ empty";
+              filenameWarningText.title = "Filename pattern is empty";
+            } else if (initialEmptyVars > 0) {
+              filenameWarningText.textContent = `⚠️ ${initialEmptyVars} empty var${initialEmptyVars > 1 ? 's' : ''}`;
+              filenameWarningText.title = `${initialEmptyVars} variable${initialEmptyVars > 1 ? 's' : ''} in pattern ${initialEmptyVars > 1 ? 'have' : 'has'} no value set`;
+            } else if (initialHasCounterAndTime) {
+              filenameWarningText.textContent = "⚠️ redundant";
+              filenameWarningText.title = "Both {counter} and %time provide uniqueness. Counter may not increment reliably when combined with %time.";
+            }
             filenameSection.header.appendChild(filenameWarningText);
             
             // Make sure header content is above the overlay
@@ -3926,7 +4024,7 @@ app.registerExtension({
             // Info icon with tooltip
             const infoIcon = document.createElement("span");
             infoIcon.textContent = "i";
-            infoIcon.title = "Build filename pattern for Image Saver.\\n\\n• {variables} - FlowPath values (replaced before saving)\\n• %variables - Image Saver values (processed by Image Saver)\\n\\nExample: {name}_%seed or {label}_%time_%seed";
+            infoIcon.title = "Build filename pattern for Image Saver.\\n\\n• {variables} - FlowPath values (replaced before saving)\\n• %variables - Image Saver values (processed by Image Saver)\\n\\n{counter} - Scans output folder and continues from highest number (0001, 0002...)\\n%counter - Image Saver's counter (starts at 0, less reliable)\\n\\nExample: {counter}_{name} or {name}_%seed";
             infoIcon.style.cssText = `
               display: inline-flex;
               align-items: center;
@@ -3949,7 +4047,7 @@ app.registerExtension({
             const filenameInput = document.createElement("input");
             filenameInput.type = "text";
             filenameInput.value = config.filename_template || "";
-            filenameInput.placeholder = "Example: {name}_%seed or {label}_%time_%seed";
+            filenameInput.placeholder = "Example: {counter}_{name} or {name}_%seed";
             filenameInput.style.cssText = `
               flex: 1;
               padding: 8px 10px;
@@ -3985,17 +4083,15 @@ app.registerExtension({
               filenamePreview.style.background = isEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.3)';
               filenamePreview.style.borderLeftColor = isEmpty ? 'rgba(239, 68, 68, 0.7)' : theme.secondary;
               
-              // Update warning overlay, text, and header border
-              filenameWarningOverlay.style.opacity = isEmpty ? '1' : '0';
-              filenameWarningText.style.display = isEmpty ? 'inline-block' : 'none';
-              filenameSection.header.style.borderColor = isEmpty ? 'rgba(239, 68, 68, 0.8)' : theme.primaryLight;
+              // Update warning for empty template or empty variables
+              updateFilenameWarning();
             };
             filenameInput.onchange = () => {
               config.filename_template = filenameInput.value;
               activePresetName = null;
               updateWidgetData();
-              // Full re-render to update filename section and header warning
-              renderUI();
+              // Don't call renderUI() here - it breaks variable button clicks
+              // The oninput handler already updates the preview
             };
             filenameInputRow.appendChild(filenameInput);
             filenameSection.content.appendChild(filenameInputRow);
@@ -4020,13 +4116,14 @@ app.registerExtension({
             quickInsertContainer.appendChild(flowPathVarsLabel);
 
             const flowPathVars = [
-              { var: "{name}", label: "Name" },
-              { var: "{label}", label: "Label" },
-              { var: "{lora}", label: "LoRA" },
-              { var: "{model}", label: "Model" },
-              { var: "{category}", label: "Category" },
-              { var: "{date}", label: "Date" },
-              { var: "{resolution}", label: "Resolution" }
+              { var: "{counter}", label: "Counter (scans folder)", configKey: null }, // Always available
+              { var: "{name}", label: "Name", configKey: "name" },
+              { var: "{label}", label: "Label", configKey: "node_label" },
+              { var: "{lora}", label: "LoRA", configKey: "lora_name" },
+              { var: "{model}", label: "Model", configKey: "model_name" },
+              { var: "{category}", label: "Category", configKey: "category" },
+              { var: "{date}", label: "Date", configKey: null }, // Always available (uses current date)
+              { var: "{resolution}", label: "Resolution", configKey: "resolution" }
             ];
 
             const flowPathBtnsRow = document.createElement("div");
@@ -4037,40 +4134,54 @@ app.registerExtension({
             `;
 
             flowPathVars.forEach(item => {
+              // Check if variable has a value
+              const hasValue = item.configKey === null || (config[item.configKey] && config[item.configKey].trim());
+              
               const btn = document.createElement("button");
               btn.textContent = item.var;
-              btn.title = `Insert ${item.label}`;
+              btn.title = hasValue 
+                ? `Insert ${item.label}` 
+                : `Insert ${item.label} (currently empty - set value in segments)`;
               btn.style.cssText = `
                 padding: 4px 8px;
-                background: ${theme.primaryLight};
-                border: 1px solid ${theme.primary};
+                background: ${hasValue ? theme.primaryLight : 'rgba(100, 100, 100, 0.3)'};
+                border: 1px solid ${hasValue ? theme.primary : 'rgba(150, 150, 150, 0.4)'};
                 border-radius: 4px;
-                color: #fff;
+                color: ${hasValue ? '#fff' : 'rgba(255, 255, 255, 0.4)'};
                 font-size: 10px;
                 font-family: 'Consolas', 'Monaco', monospace;
                 cursor: pointer;
                 transition: all 0.2s;
               `;
               btn.onmouseover = () => {
-                btn.style.background = theme.primary;
+                btn.style.background = hasValue ? theme.primary : 'rgba(120, 120, 120, 0.4)';
                 btn.style.transform = 'scale(1.05)';
               };
               btn.onmouseout = () => {
-                btn.style.background = theme.primaryLight;
+                btn.style.background = hasValue ? theme.primaryLight : 'rgba(100, 100, 100, 0.3)';
                 btn.style.transform = 'scale(1)';
               };
-              btn.onclick = () => {
+              btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 // Insert at cursor position or end
-                const cursorPos = filenameInput.selectionStart;
+                const cursorPos = filenameInput.selectionStart ?? filenameInput.value.length;
                 const textBefore = filenameInput.value.substring(0, cursorPos);
                 const textAfter = filenameInput.value.substring(cursorPos);
                 filenameInput.value = textBefore + item.var + textAfter;
                 config.filename_template = filenameInput.value;
                 activePresetName = null;
                 updateWidgetData();
+                // Update preview without full re-render
+                updatePreview();
+                // Update filename section preview and warning
+                const previewText = replaceTemplateVars(filenameInput.value, true);
+                filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${previewText}</span>`;
+                filenamePreview.style.background = 'rgba(0, 0, 0, 0.3)';
+                filenamePreview.style.borderLeftColor = theme.secondary;
+                updateFilenameWarning();
                 filenameInput.focus();
                 filenameInput.setSelectionRange(cursorPos + item.var.length, cursorPos + item.var.length);
-                renderUI();
               };
               flowPathBtnsRow.appendChild(btn);
             });
@@ -4092,7 +4203,6 @@ app.registerExtension({
               { var: "%seed", label: "Seed" },
               { var: "%time", label: "Time" },
               { var: "%date", label: "Date" },
-              { var: "%counter", label: "Counter" },
               { var: "%model", label: "Model" },
               { var: "%width", label: "Width" },
               { var: "%height", label: "Height" }
@@ -4130,18 +4240,27 @@ app.registerExtension({
                 btn.style.color = theme.secondary;
                 btn.style.transform = 'scale(1)';
               };
-              btn.onclick = () => {
+              btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 // Insert at cursor position or end
-                const cursorPos = filenameInput.selectionStart;
+                const cursorPos = filenameInput.selectionStart ?? filenameInput.value.length;
                 const textBefore = filenameInput.value.substring(0, cursorPos);
                 const textAfter = filenameInput.value.substring(cursorPos);
                 filenameInput.value = textBefore + item.var + textAfter;
                 config.filename_template = filenameInput.value;
                 activePresetName = null;
                 updateWidgetData();
+                // Update preview without full re-render
+                updatePreview();
+                // Update filename section preview and warning
+                const previewText = replaceTemplateVars(filenameInput.value, true);
+                filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${previewText}</span>`;
+                filenamePreview.style.background = 'rgba(0, 0, 0, 0.3)';
+                filenamePreview.style.borderLeftColor = theme.secondary;
+                updateFilenameWarning();
                 filenameInput.focus();
                 filenameInput.setSelectionRange(cursorPos + item.var.length, cursorPos + item.var.length);
-                renderUI();
               };
               imageSaverBtnsRow.appendChild(btn);
             });

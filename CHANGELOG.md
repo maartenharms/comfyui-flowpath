@@ -5,6 +5,34 @@ All notable changes to FlowPath will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-02-01
+
+### Added
+
+#### `{counter}` Variable
+- **Folder-scanning sequential counter** - A1111-style numbering that persists across ComfyUI restarts
+- Scans output folder for existing files and finds the next available number
+- Zero-padded to 4 digits (0001, 0002, 0003...)
+- Works with Image Saver's `%variables` in the same filename pattern
+- Shows as `####` in preview (actual value calculated at generation time)
+
+### Changed
+- **Removed `%counter`** from Image Saver quick-insert buttons (Image Saver's counter starts at 0 and doesn't scan folders)
+
+### Fixed
+- **Variable button clicks** - Fixed issue where clicking variable buttons didn't work due to `onchange` handler calling `renderUI()`
+- **Empty variable indicators** - Variable buttons now appear greyed out when their config value is empty, with explanatory tooltip
+- **Filename warning improvements** - Shows "empty" instead of "1 empty", adds "X empty vars" warning when filename contains empty variables
+- **Output preview empty variables** - Empty variables now show in red `[placeholder]` style instead of being hidden
+- **Counter regex fixes** - Fixed regex escaping issues that prevented `{counter}` from finding existing files with `%variables`
+- **Redundant uniqueness warning** - Yellow warning when using both `{counter}` and `%time` together (both provide uniqueness, counter may not increment reliably)
+- **Filename header gradient** - Warning states now use full gradient backgrounds matching other section headers
+
+### Code Quality
+- Removed all debug print() statements from Python backend (cleaner server logs)
+
+---
+
 ## [1.2.0] - 2026-01-31
 
 ### Added

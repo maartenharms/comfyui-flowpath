@@ -4,8 +4,21 @@ Intelligent path organization with themes, auto-detection, and template variable
 """
 
 import os
+import re
 import json
+import glob
 from datetime import datetime
+
+# Try to import ComfyUI's folder_paths for output directory
+try:
+    import folder_paths
+
+    COMFYUI_OUTPUT_DIR = folder_paths.get_output_directory()
+except ImportError:
+    COMFYUI_OUTPUT_DIR = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+        "output",
+    )
 
 
 class FlowPath:
@@ -41,6 +54,72 @@ class FlowPath:
     FUNCTION = "build_path"
     CATEGORY = "🌊 FlowPath"
     OUTPUT_NODE = False
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always return NaN to force re-execution every time
+        # This is needed because {counter} must scan the folder each run
+        return float("nan")
+
+    def _get_next_counter(self, folder_path, filename_pattern, padding=4):
+        """
+        Scan output folder and find the next available counter number.
+
+        Args:
+            folder_path: The folder to scan (relative to ComfyUI output dir)
+            filename_pattern: Filename with {counter} placeholder
+            padding: Number of digits for zero-padding (default 4 = 0001)
+
+        Returns:
+            int: Next available counter number
+        """
+        # Build full path to the output folder
+        full_folder = (
+            os.path.join(COMFYUI_OUTPUT_DIR, folder_path)
+            if folder_path
+            else COMFYUI_OUTPUT_DIR
+        )
+
+        # If folder doesn't exist, start at 1
+        if not os.path.exists(full_folder):
+            return 1
+
+        # Build regex pattern from filename
+        # Replace {counter} with a capture group for digits
+        # Escape other regex special chars
+        if "{counter}" not in filename_pattern.lower():
+            return 1
+
+        # Create regex pattern: escape special chars, then replace {counter} with digit capture
+        regex_pattern = re.escape(filename_pattern)
+        # Handle both {counter} and {COUNTER} - use string replace to avoid backreference issues
+        regex_pattern = regex_pattern.replace(r"\{counter\}", r"(\d+)")
+        regex_pattern = regex_pattern.replace(r"\{COUNTER\}", r"(\d+)")
+        # Replace Image Saver %variables with wildcards (they get processed by Image Saver)
+        # %seed, %time, %date, %model, %width, %height, %counter, etc.
+        # Note: % is NOT escaped by re.escape, so match literal %
+        # Use [^/\\]* to match any characters except path separators (allows empty or any value)
+        regex_pattern = re.sub(r"%\w+", lambda m: r"[^/\\]*", regex_pattern)
+        # Match optional Image Saver suffix (_00, _01, etc.) and any extension
+        regex_pattern = regex_pattern + r"(_\d+)?\.[a-zA-Z0-9]+"
+        regex_pattern = "^" + regex_pattern + "$"
+
+        # Scan folder for matching files
+        highest = 0
+        try:
+            for filename in os.listdir(full_folder):
+                match = re.match(regex_pattern, filename, re.IGNORECASE)
+                if match:
+                    try:
+                        num = int(match.group(1))
+                        if num > highest:
+                            highest = num
+                    except (ValueError, IndexError):
+                        pass
+        except OSError:
+            return 1
+
+        return highest + 1
 
     def _replace_template_vars(self, template, config):
         """
@@ -118,84 +197,38 @@ class FlowPath:
         Returns:
             tuple: (constructed_path_string, constructed_filename_string)
         """
-        print(f"\n{'=' * 60}")
-        print(f"[FlowPath] build_path called!")
-        print(f"[FlowPath] Raw widget_data length: {len(widget_data)} characters")
-        print(f"[FlowPath] First 200 chars: {widget_data[:200]}")
-
         try:
             data = json.loads(widget_data)
-            print(f"[FlowPath] JSON parsed successfully")
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             # Invalid JSON, return empty path and filename
-            print(f"[FlowPath] JSON parse FAILED: {e}")
             return ("", "")
 
         segments = data.get("segments", [])
         config = data.get("config", {})
 
-        # Debug: Print all segments and config
-        print(f"[FlowPath] Segments received: {segments}")
-        print(f"[FlowPath] Config received: {config}")
-        print(f"[FlowPath] node_label value: '{config.get('node_label', 'NOT SET')}'")
-
-        # Check if label segment exists and is enabled
-        label_segment = next((s for s in segments if s.get("type") == "label"), None)
-        if label_segment:
-            print(f"[FlowPath] Label segment found: {label_segment}")
-            print(
-                f"[FlowPath] node_label in config: '{config.get('node_label', 'NOT FOUND')}'"
-            )
-        else:
-            print(f"[FlowPath] WARNING: No label segment in segments array!")
-
         # DYNAMIC SEED DETECTION: Override seed from config with current workflow seed
-        print(f"[FlowPath] Attempting dynamic seed detection...")
-        print(f"[FlowPath] Prompt parameter received: {prompt is not None}")
-        print(
-            f"[FlowPath] Seed in config before detection: {config.get('seed', 'NOT SET')}"
-        )
-
         try:
             dynamic_seed = self._detect_seed_from_prompt(prompt)
-            print(f"[FlowPath] Dynamic seed detection returned: {dynamic_seed}")
-
             if dynamic_seed is not None:
-                print(
-                    f"[FlowPath] Dynamic seed detected: {dynamic_seed} (overriding config)"
-                )
                 config["seed"] = str(dynamic_seed)
-            elif config.get("seed"):
-                print(f"[FlowPath] Using seed from config: {config['seed']}")
-            else:
-                print(f"[FlowPath] No seed found (dynamic or config)")
-        except Exception as e:
-            print(f"[FlowPath] ERROR during seed detection: {e}")
-            import traceback
-
-            traceback.print_exc()
+        except Exception:
+            pass  # Seed detection failed, use config seed if available
 
         path_parts = []
 
         # Process each segment in order
-        print(f"[FlowPath] Processing {len(segments)} segments...")
         for segment in segments:
-            print(f"[FlowPath] Segment: {segment}")
             # Skip disabled segments
             if not segment.get("enabled", True):
-                print(f"[FlowPath] Skipping disabled segment: {segment.get('type')}")
                 continue
 
             seg_type = segment.get("type", "")
-            print(f"[FlowPath] Processing segment type: '{seg_type}'")
 
             # Handle each segment type
             if seg_type == "label":
                 value = config.get("node_label", "").strip()
-                print(f"[FlowPath] Processing LABEL segment - value: '{value}'")
                 if value:
                     path_parts.append(self._sanitize(value))
-                    print(f"[FlowPath] Added label to path: '{value}'")
 
             elif seg_type == "file_type":
                 value = config.get("file_type", "Image")
@@ -251,51 +284,32 @@ class FlowPath:
 
             elif seg_type == "lora":
                 value = config.get("lora_name", "")
-                print(
-                    f"[FlowPath] LoRA segment - Raw value: {repr(value)}, Type: {type(value)}"
-                )
 
                 # Handle different value types
                 if isinstance(value, list):
                     # Separate folders mode - add each LoRA as a separate path part
-                    print(f"[FlowPath] Processing as list with {len(value)} items")
                     for lora in value:
                         lora_str = str(lora).strip()
                         if lora_str:
-                            sanitized = self._sanitize(lora_str)
-                            print(f"[FlowPath] Adding LoRA folder: {sanitized}")
-                            path_parts.append(sanitized)
+                            path_parts.append(self._sanitize(lora_str))
                 elif isinstance(value, str):
                     # Check for pipe-delimited format (separate mode stored as string)
                     if " | " in value:
                         # Split and add each as separate folder
-                        print(f"[FlowPath] Processing as pipe-delimited string")
                         for lora in value.split(" | "):
                             lora_str = lora.strip()
                             if lora_str:
-                                sanitized = self._sanitize(lora_str)
-                                print(f"[FlowPath] Adding LoRA folder: {sanitized}")
-                                path_parts.append(sanitized)
+                                path_parts.append(self._sanitize(lora_str))
                     else:
                         # Single string value (all other modes)
                         value_str = value.strip()
-                        print(f"[FlowPath] Processing as single string: '{value_str}'")
                         if value_str:
-                            sanitized = self._sanitize(value_str)
-                            print(f"[FlowPath] Adding LoRA folder: {sanitized}")
-                            path_parts.append(sanitized)
-                        else:
-                            print(f"[FlowPath] LoRA value is empty after strip!")
+                            path_parts.append(self._sanitize(value_str))
                 else:
                     # Fallback: try to convert to string
-                    print(f"[FlowPath] Processing as fallback (unexpected type)")
                     value_str = str(value).strip()
                     if value_str:
-                        sanitized = self._sanitize(value_str)
-                        print(f"[FlowPath] Adding LoRA folder: {sanitized}")
-                        path_parts.append(sanitized)
-                    else:
-                        print(f"[FlowPath] LoRA value is empty after conversion!")
+                        path_parts.append(self._sanitize(value_str))
 
             elif seg_type == "custom":
                 value = segment.get("value", "").strip()
@@ -315,24 +329,36 @@ class FlowPath:
             output_mode = config.get("output_mode", "saveImage")
             final_path = "ComfyUI" if output_mode == "saveImage" else ""
 
-        print(f"[FlowPath] Path parts: {path_parts}")
-        print(f"[FlowPath] Final path: {final_path}")
-
         # Build filename from template (for Image Saver compatibility)
-        # Supports FlowPath vars {name} and Image Saver pass-through vars %seed
+        # Supports FlowPath vars {name}, {counter} and Image Saver pass-through vars %seed
         filename_template = config.get("filename_template", "")
 
         if filename_template:
             # Process FlowPath template variables (Image Saver % vars pass through)
             final_filename = self._replace_template_vars(filename_template, config)
+
+            # Handle {counter} specially - needs to scan folder for existing files
+            if "{counter}" in final_filename.lower():
+                # Get padding setting (default 4 digits = 0001)
+                counter_padding = config.get("counter_padding", 4)
+
+                # Calculate next counter by scanning the output folder
+                next_counter = self._get_next_counter(
+                    final_path, final_filename, counter_padding
+                )
+
+                # Format with zero-padding
+                counter_str = str(next_counter).zfill(counter_padding)
+
+                # Replace {counter} and {COUNTER} with the actual value
+                final_filename = re.sub(
+                    r"\{counter\}", counter_str, final_filename, flags=re.IGNORECASE
+                )
+
             # Sanitize but preserve % variables for Image Saver
             final_filename = self._sanitize_filename(final_filename)
         else:
             final_filename = ""
-
-        print(f"[FlowPath] Filename template: '{filename_template}'")
-        print(f"[FlowPath] Final filename: '{final_filename}'")
-        print(f"{'=' * 60}\n")
 
         return (final_path, final_filename)
 
@@ -371,7 +397,6 @@ class FlowPath:
                 "SamplerCustomAdvanced",
             ]
 
-            print(f"[FlowPath] Searching for seed in {len(prompt)} nodes...")
             detected_seeds = []
 
             for node_id, node_data in prompt.items():
@@ -380,29 +405,14 @@ class FlowPath:
                 # Priority 1: Check for Seed Generator nodes (highest priority)
                 if any(gen_type in class_type for gen_type in seed_generator_types):
                     inputs = node_data.get("inputs", {})
-                    print(
-                        f"[FlowPath] Found seed generator node {node_id} ({class_type})"
-                    )
-                    print(f"[FlowPath] Inputs: {inputs}")
-
-                    # Seed generators output the seed directly
                     seed = inputs.get("seed")
                     if seed is not None:
-                        # Handle both single values and arrays [seed, batch_index]
-                        original_seed = seed
                         if isinstance(seed, (list, tuple)):
-                            seed = seed[0]  # Extract actual seed value
-
-                        # Try to convert to int if it's a string
+                            seed = seed[0]
                         try:
                             seed = int(seed)
                         except (ValueError, TypeError):
                             pass
-
-                        print(
-                            f"[FlowPath] Found seed in {class_type} node {node_id}: {seed} (original: {original_seed})"
-                        )
-                        # Prepend with priority marker (0 = highest priority)
                         detected_seeds.append((0, node_id, seed, class_type))
 
                 # Priority 2: Check for noise generator nodes (for SamplerCustomAdvanced)
@@ -410,74 +420,36 @@ class FlowPath:
                     noise_type in class_type for noise_type in noise_generator_types
                 ):
                     inputs = node_data.get("inputs", {})
-                    print(
-                        f"[FlowPath] Found noise generator node {node_id} ({class_type})"
-                    )
-                    print(f"[FlowPath] Inputs: {inputs}")
-
-                    # Noise generators use "noise_seed" instead of "seed"
                     seed = inputs.get("noise_seed")
                     if seed is not None:
-                        # Handle both single values and arrays [seed, batch_index]
-                        original_seed = seed
                         if isinstance(seed, (list, tuple)):
-                            seed = seed[0]  # Extract actual seed value
-
-                        # Try to convert to int if it's a string
+                            seed = seed[0]
                         try:
                             seed = int(seed)
                         except (ValueError, TypeError):
                             pass
-
-                        print(
-                            f"[FlowPath] Found noise_seed in {class_type} node {node_id}: {seed} (original: {original_seed})"
-                        )
-                        # Priority 1 (between seed generators and samplers)
                         detected_seeds.append((1, node_id, seed, class_type))
 
                 # Priority 3: Check for sampler nodes (fallback)
                 elif any(sampler_type in class_type for sampler_type in sampler_types):
                     inputs = node_data.get("inputs", {})
-                    print(f"[FlowPath] Found sampler node {node_id} ({class_type})")
-                    print(f"[FlowPath] Inputs: {inputs}")
-
-                    # Get seed from inputs
                     seed = inputs.get("seed")
                     if seed is not None:
-                        # Handle both single values and arrays [seed, batch_index]
-                        original_seed = seed
                         if isinstance(seed, (list, tuple)):
-                            seed = seed[0]  # Extract actual seed value
-
-                        # Try to convert to int if it's a string
+                            seed = seed[0]
                         try:
                             seed = int(seed)
                         except (ValueError, TypeError):
                             pass
-
-                        print(
-                            f"[FlowPath] Found seed in {class_type} node {node_id}: {seed} (original: {original_seed})"
-                        )
-                        # Append with lower priority (2 = lowest priority)
                         detected_seeds.append((2, node_id, seed, class_type))
 
-            # Log all detected seeds
             if detected_seeds:
                 # Sort by priority (0 = highest), then by node_id (earliest first)
                 detected_seeds.sort(key=lambda x: (x[0], x[1]))
-                print(f"[FlowPath] All detected seeds: {detected_seeds}")
-                # Return the highest priority seed
                 return detected_seeds[0][2]  # Index 2 is the seed value
-            else:
-                print(
-                    f"[FlowPath] No seeds found in any seed generator or sampler nodes"
-                )
 
-        except Exception as e:
-            print(f"[FlowPath] Error detecting seed from prompt: {e}")
-            import traceback
-
-            traceback.print_exc()
+        except Exception:
+            pass
 
         return None
 
