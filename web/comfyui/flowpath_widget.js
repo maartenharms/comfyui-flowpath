@@ -2384,8 +2384,20 @@ app.registerExtension({
           // Track which variables are empty for highlighting
           const emptyVars = new Set();
           
+          // Helper to check if a segment exists and is enabled
+          const segmentExists = (segmentType) => segments.some(s => s.type === segmentType && s.enabled);
+          
           // Define available variables - show placeholder text when empty if showPlaceholders is true
-          const getVal = (value, placeholder) => {
+          // Now also checks if the corresponding segment exists
+          const getVal = (value, placeholder, segmentType) => {
+            // If segment type specified and segment doesn't exist, treat as empty
+            if (segmentType && !segmentExists(segmentType)) {
+              emptyVars.add(placeholder);
+              if (highlightEmpty) {
+                return `<span style="color: #ef4444; font-style: italic;">[${placeholder}]</span>`;
+              }
+              return showPlaceholders ? `[${placeholder}]` : "";
+            }
             if (value && value.trim()) return value;
             emptyVars.add(placeholder);
             if (highlightEmpty) {
@@ -2396,27 +2408,27 @@ app.registerExtension({
           
           const vars = {
             counter: "####", // Preview placeholder - actual value calculated by scanning folder at runtime
-            label: getVal(config.node_label, "label"),
-            output: getVal(config.node_label, "label"), // Alias
-            filetype: config.file_type || "Image",
-            file_type: config.file_type || "Image", // Alias
-            category: config.category || "Characters",
-            name: getVal(config.name, "name"),
-            content_rating: config.content_rating || "SFW",
-            rating: config.content_rating || "SFW", // Alias
-            sfw: config.content_rating === "SFW" ? "SFW" : "",
-            nsfw: config.content_rating === "NSFW" ? "NSFW" : "",
-            project: getVal(config.project_name, "project"),
-            series: getVal(config.series_name, "series"),
-            resolution: getVal(config.resolution, "resolution"),
-            res: getVal(config.resolution, "resolution"), // Alias
-            model: getVal(config.model_name, "model"),
-            lora: getVal(config.lora_name, "lora"),
-            seed: "[seed-auto]", // Seed is always dynamic
-            date: new Date().toISOString().split('T')[0], // Actual current date
-            year: new Date().getFullYear().toString(),
-            month: String(new Date().getMonth() + 1).padStart(2, '0'),
-            day: String(new Date().getDate()).padStart(2, '0')
+            label: getVal(config.node_label, "label", "output_label"),
+            output: getVal(config.node_label, "label", "output_label"), // Alias
+            filetype: segmentExists("file_type") ? (config.file_type || "Image") : (showPlaceholders ? "[filetype]" : ""),
+            file_type: segmentExists("file_type") ? (config.file_type || "Image") : (showPlaceholders ? "[filetype]" : ""), // Alias
+            category: getVal(config.category, "category", "category"),
+            name: getVal(config.name, "name", "name"),
+            content_rating: getVal(config.content_rating, "rating", "content_rating"),
+            rating: getVal(config.content_rating, "rating", "content_rating"), // Alias
+            sfw: segmentExists("content_rating") && config.content_rating === "SFW" ? "SFW" : "",
+            nsfw: segmentExists("content_rating") && config.content_rating === "NSFW" ? "NSFW" : "",
+            project: getVal(config.project_name, "project", "project"),
+            series: getVal(config.series_name, "series", "series"),
+            resolution: getVal(config.resolution, "resolution", "resolution"),
+            res: getVal(config.resolution, "resolution", "resolution"), // Alias
+            model: getVal(config.model_name, "model", "model"),
+            lora: getVal(config.lora_name, "lora", "lora"),
+            seed: segmentExists("seed") ? "[seed-auto]" : (showPlaceholders ? "[seed]" : ""),
+            date: segmentExists("date") ? new Date().toISOString().split('T')[0] : (showPlaceholders ? "[date]" : ""),
+            year: new Date().getFullYear().toString(), // Always available
+            month: String(new Date().getMonth() + 1).padStart(2, '0'), // Always available
+            day: String(new Date().getDate()).padStart(2, '0') // Always available
           };
           
           // Replace {variable} with actual values
@@ -5575,20 +5587,36 @@ app.registerExtension({
               const template = config.filename_template || "";
               if (!template) return { isEmpty: true, emptyVars: 0 };
               
-              const varMappings = {
-                '{name}': config.name,
-                '{label}': config.node_label,
-                '{lora}': config.lora_name,
-                '{model}': config.model_name,
-                '{category}': config.category,
-                '{resolution}': config.resolution,
-                // {counter} and {date} are always available
-              };
+              // Variables that require both segment AND config value
+              const varMappings = [
+                { var: '{name}', configKey: 'name', segmentType: 'name' },
+                { var: '{project}', configKey: 'project_name', segmentType: 'project' },
+                { var: '{series}', configKey: 'series_name', segmentType: 'series' },
+                { var: '{label}', configKey: 'node_label', segmentType: 'output_label' },
+                { var: '{lora}', configKey: 'lora_name', segmentType: 'lora' },
+                { var: '{model}', configKey: 'model_name', segmentType: 'model' },
+                { var: '{category}', configKey: 'category', segmentType: 'category' },
+                { var: '{rating}', configKey: 'content_rating', segmentType: 'content_rating' },
+                { var: '{resolution}', configKey: 'resolution', segmentType: 'resolution' },
+                { var: '{seed}', configKey: null, segmentType: 'seed' }, // Dynamic, but needs segment
+                { var: '{date}', configKey: null, segmentType: 'date' }, // Needs date segment
+                // {counter}, {year}, {month}, {day} are always available - no segment required
+              ];
               
               let emptyCount = 0;
-              for (const [varName, value] of Object.entries(varMappings)) {
-                if (template.toLowerCase().includes(varName) && (!value || !value.trim())) {
-                  emptyCount++;
+              const templateLower = template.toLowerCase();
+              
+              for (const item of varMappings) {
+                if (templateLower.includes(item.var)) {
+                  // Check if segment exists and is enabled
+                  const segmentExists = segments.some(s => s.type === item.segmentType && s.enabled);
+                  // Check if config has value (for vars with configKey)
+                  const hasConfigValue = item.configKey === null || (config[item.configKey] && config[item.configKey].trim());
+                  
+                  // Count as empty if segment doesn't exist OR config is empty
+                  if (!segmentExists || !hasConfigValue) {
+                    emptyCount++;
+                  }
                 }
               }
               return { isEmpty: false, emptyVars: emptyCount };
@@ -5808,21 +5836,21 @@ app.registerExtension({
             quickInsertContainer.appendChild(flowPathVarsLabel);
 
             const flowPathVars = [
-              { var: "{counter}", label: "Counter (scans folder)", configKey: null }, // Always available
-              { var: "{name}", label: "Name", configKey: "name" },
-              { var: "{project}", label: "Project", configKey: "project_name" },
-              { var: "{series}", label: "Series", configKey: "series_name" },
-              { var: "{label}", label: "Label", configKey: "node_label" },
-              { var: "{model}", label: "Model", configKey: "model_name" },
-              { var: "{lora}", label: "LoRA", configKey: "lora_name" },
-              { var: "{seed}", label: "Seed (dynamic)", configKey: null }, // Dynamic at runtime
-              { var: "{category}", label: "Category", configKey: "category" },
-              { var: "{rating}", label: "Rating (SFW/NSFW)", configKey: "content_rating" },
-              { var: "{resolution}", label: "Resolution", configKey: "resolution" },
-              { var: "{date}", label: "Date", configKey: null }, // Always available (uses current date)
-              { var: "{year}", label: "Year", configKey: null },
-              { var: "{month}", label: "Month", configKey: null },
-              { var: "{day}", label: "Day", configKey: null }
+              { var: "{counter}", label: "Counter (scans folder)", configKey: null, segmentType: null }, // Always available
+              { var: "{name}", label: "Name", configKey: "name", segmentType: "name" },
+              { var: "{project}", label: "Project", configKey: "project_name", segmentType: "project" },
+              { var: "{series}", label: "Series", configKey: "series_name", segmentType: "series" },
+              { var: "{label}", label: "Label", configKey: "node_label", segmentType: "output_label" },
+              { var: "{model}", label: "Model", configKey: "model_name", segmentType: "model" },
+              { var: "{lora}", label: "LoRA", configKey: "lora_name", segmentType: "lora" },
+              { var: "{seed}", label: "Seed (dynamic)", configKey: null, segmentType: "seed" }, // Dynamic at runtime
+              { var: "{category}", label: "Category", configKey: "category", segmentType: "category" },
+              { var: "{rating}", label: "Rating (SFW/NSFW)", configKey: "content_rating", segmentType: "content_rating" },
+              { var: "{resolution}", label: "Resolution", configKey: "resolution", segmentType: "resolution" },
+              { var: "{date}", label: "Date", configKey: null, segmentType: "date" },
+              { var: "{year}", label: "Year", configKey: null, segmentType: null }, // Always available
+              { var: "{month}", label: "Month", configKey: null, segmentType: null }, // Always available
+              { var: "{day}", label: "Day", configKey: null, segmentType: null } // Always available
             ];
 
             const flowPathBtnsRow = document.createElement("div");
@@ -5833,14 +5861,24 @@ app.registerExtension({
             `;
 
             flowPathVars.forEach(item => {
-              // Check if variable has a value
-              const hasValue = item.configKey === null || (config[item.configKey] && config[item.configKey].trim());
+              // Check if segment exists and is enabled (for segment-based vars)
+              const segmentExists = item.segmentType === null || segments.some(s => s.type === item.segmentType && s.enabled);
+              // Check if variable has a value (config has data)
+              const hasConfigValue = item.configKey === null || (config[item.configKey] && config[item.configKey].trim());
+              // Variable is "active" only if segment exists AND has value (or is always-available like counter/year/month/day)
+              const hasValue = segmentExists && hasConfigValue;
               
               const btn = document.createElement("button");
               btn.textContent = item.var;
-              btn.title = hasValue 
-                ? `Insert ${item.label}` 
-                : `Insert ${item.label} (currently empty - set value in segments)`;
+              let tooltip = `Insert ${item.label}`;
+              if (!hasValue) {
+                if (!segmentExists && item.segmentType) {
+                  tooltip += ` (segment not added - add "${item.segmentType}" segment first)`;
+                } else if (!hasConfigValue && item.configKey) {
+                  tooltip += ` (currently empty - set value in segments)`;
+                }
+              }
+              btn.title = tooltip;
               btn.style.cssText = `
                 padding: 4px 8px;
                 background: ${hasValue ? theme.primaryLight : 'rgba(100, 100, 100, 0.3)'};

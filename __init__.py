@@ -35,9 +35,7 @@ WEB_DIRECTORY = "./web/comfyui"
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
 
 # Version
-__version__ = (
-    "1.3.0"  # Theme dropdown, custom themes, UI/UX improvements, security fixes
-)
+__version__ = "1.3.1"  # Hotfix: Variables now properly check if segment exists
 __license__ = "MIT"  # Free to use - donations appreciated
 
 

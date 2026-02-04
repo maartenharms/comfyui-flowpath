@@ -5,6 +5,15 @@ All notable changes to FlowPath will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-02-04
+
+### Fixed
+- **Variable buttons now check segment existence** - FlowPath variable buttons (like `{name}`, `{model}`, `{rating}`) are now properly grayed out when the corresponding segment is not added to the node
+- **Filename preview no longer shows cached data** - Preview now shows `[placeholder]` instead of stale values when a segment is removed
+- **Empty variable warnings** - The "X empty vars" warning now correctly counts variables whose segments don't exist
+
+---
+
 ## [1.3.0] - 2026-02-04
 
 ### Added
