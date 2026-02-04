@@ -5,6 +5,71 @@ All notable changes to FlowPath will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-04
+
+### Added
+
+#### Theme Dropdown
+- **Quick theme switcher** - New ⚙ button next to SI/IS toggle opens theme dropdown
+- **Color swatches** - Each theme shows gradient preview of its colors
+- **Active theme highlight** - Green background indicates current theme
+- **Create Custom Theme** option at bottom of dropdown
+
+#### Custom Themes
+- **Theme Editor** - Full visual editor to create custom themes
+- **Live preview** - See your theme applied to a dummy node as you edit
+- **Edit existing themes** - Modify your custom themes anytime
+- **Delete themes** - Remove custom themes from dropdown (hover to reveal X button)
+- **10 theme limit** - Visual feedback (red flash) when limit reached
+- **24 character name limit** - Prevents overly long theme names
+
+#### Subgraph/Group Node Support
+- **Recursive node detection** - Auto-detect now finds Models, LoRAs, Seeds, and Resolution inside ComfyUI subgraphs/group nodes
+- Fixes issue where nodes inside groups weren't detected
+
+#### New Filename Variables
+- `{project}` - Project name from config
+- `{series}` - Series name from config
+- `{seed}` - Seed value (dynamic at runtime)
+- `{rating}` - Content rating (SFW/NSFW)
+- `{year}` - Current year (4 digits)
+- `{month}` - Current month (2 digits)
+- `{day}` - Current day (2 digits)
+- Total of 15 quick-insert variables now available
+
+### Changed
+
+#### UI/UX Improvements
+- **Standardized dropdowns** - Add Segment dropdown now matches theme dropdown styling
+- **Solid dropdown backgrounds** - No more confusing transparency
+- **Subtle glass scrollbars** - Elegant semi-transparent white scrollbars throughout
+- **Visual divider** - Clear separation between SI/IS buttons and theme button
+- **Clickable Ko-fi link** - Donation link in banner now actually opens
+
+#### Image Saver Variables
+- Now styled consistently with FlowPath Variables (themed colors, not grayed out)
+- Visual separator between FlowPath and Image Saver variable sections
+
+### Fixed
+
+#### Security (Critical)
+- **Command Injection (RCE)** - Fixed PowerShell injection in folder open endpoints
+- **Path Traversal** - Added case-insensitive validation on Windows
+- **XSS Prevention** - HTML escaping on all user-generated content
+- **Rate Limiting** - 0.5s cooldown between API requests
+- **Error Disclosure** - Generic errors to client, detailed logging server-side
+- **localStorage Validation** - Theme and preset object validators
+
+#### Bug Fixes
+- Dropdown toggle behavior - clicking open dropdown now closes it
+- Dropdown positioning - no longer jumps to top-left after actions
+- Theme editor starts with current theme values (not hardcoded defaults)
+
+### Updated
+- Example workflows now include base checkpoint for easier testing
+
+---
+
 ## [1.2.1] - 2026-02-01
 
 ### Added

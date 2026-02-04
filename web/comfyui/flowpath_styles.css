@@ -91,17 +91,18 @@
 }
 
 .gsp-segment-list-container::-webkit-scrollbar-track {
-    background: rgba(20, 20, 20, 0.5);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 4px;
 }
 
 .gsp-segment-list-container::-webkit-scrollbar-thumb {
-    background: rgba(66, 153, 225, 0.4);
+    background: rgba(255, 255, 255, 0.18);
     border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .gsp-segment-list-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(66, 153, 225, 0.6);
+    background: rgba(255, 255, 255, 0.28);
 }
 
 /* Segment Item */

@@ -1,6 +1,31 @@
 import { app } from "../../scripts/app.js";
 
-console.log("🌊 FlowPath v1.2.0 loaded");
+console.log("🌊 FlowPath v1.2.1 loaded");
+
+// Security: HTML escape function to prevent XSS attacks
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  const str = String(text);
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Security: Validate that an object has expected structure
+function isValidThemeObject(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const requiredKeys = ['name', 'primary', 'primaryLight', 'primaryDark', 'gradient', 'accent', 'secondary', 'background'];
+  return requiredKeys.every(key => typeof obj[key] === 'string');
+}
+
+// Security: Validate preset object structure
+function isValidPresetObject(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  // Presets should have segments array and config object
+  if (obj.segments && !Array.isArray(obj.segments)) return false;
+  if (obj.config && typeof obj.config !== 'object') return false;
+  return true;
+}
 
 // Helper function to chain callbacks
 function chainCallback(object, property, callback) {
@@ -89,6 +114,853 @@ const THEMES = {
   }
 };
 
+// Custom themes storage (loaded from localStorage with validation)
+let customThemes = {};
+try {
+  const stored = localStorage.getItem('flowpath_custom_themes');
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    // Validate structure: should be an object with theme objects as values
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      // Validate each theme
+      for (const [key, theme] of Object.entries(parsed)) {
+        if (isValidThemeObject(theme)) {
+          customThemes[key] = theme;
+        } else {
+          console.warn(`[FlowPath] Invalid custom theme "${key}" - skipping`);
+        }
+      }
+    }
+  }
+} catch (e) {
+  console.warn('[FlowPath] Failed to load custom themes, resetting:', e);
+  localStorage.removeItem('flowpath_custom_themes');
+}
+
+// Save custom themes to localStorage
+function saveCustomThemes() {
+  try {
+    localStorage.setItem('flowpath_custom_themes', JSON.stringify(customThemes));
+  } catch (e) {
+    console.warn('[FlowPath] Failed to save custom themes:', e);
+  }
+}
+
+// Get all themes (built-in + custom)
+function getAllThemes() {
+  return { ...THEMES, ...customThemes };
+}
+
+// Helper to convert hex to RGB
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 147, g: 51, b: 234 }; // Default purple
+}
+
+// Helper to convert RGB to hex
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(x => {
+    const hex = Math.round(x).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  }).join('');
+}
+
+// Helper to darken/lighten a color
+function adjustColor(hex, percent) {
+  const rgb = hexToRgb(hex);
+  const factor = percent / 100;
+  return rgbToHex(
+    Math.min(255, Math.max(0, rgb.r + (rgb.r * factor))),
+    Math.min(255, Math.max(0, rgb.g + (rgb.g * factor))),
+    Math.min(255, Math.max(0, rgb.b + (rgb.b * factor)))
+  );
+}
+
+// Helper to get contrasting text color for a background
+function getContrastColor(hexColor) {
+  const rgb = hexToRgb(hexColor);
+  // Calculate relative luminance
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+// Theme Editor Modal - Side-by-side layout with dummy node preview
+function openThemeEditor(existingThemeKey = null) {
+  const isEditing = existingThemeKey && customThemes[existingThemeKey];
+  
+  // Get the theme to use as base - either the one being edited, or the current active theme
+  const getAllThemesLocal = () => ({ ...THEMES, ...customThemes });
+  const currentThemeKey = globalSettings.theme || 'umbrael';
+  const baseTheme = isEditing 
+    ? customThemes[existingThemeKey] 
+    : (getAllThemesLocal()[currentThemeKey] || THEMES.umbrael);
+  
+  // Initialize with base theme values
+  let themeName = isEditing ? baseTheme.name : 'My Custom Theme';
+  let primaryColor = baseTheme.primary || '#9333ea';
+  let accentColor = baseTheme.accent || '#fbbf24';
+  let secondaryColor = baseTheme.secondary || '#a855f7';
+  
+  // Default opacity values
+  let primaryLightOpacity = 0.3;
+  let primaryDarkOpacity = 0.6;
+  let gradientColor2 = accentColor;
+  let gradientOpacity1 = 0.2;
+  let gradientOpacity2 = 0.1;
+  let bgColor1 = '#111827';
+  let bgColor2 = '#1e1432';
+  let bgOpacity1 = 0.6;
+  let bgOpacity2 = 0.4;
+
+  // Parse theme values from the base theme
+  if (baseTheme) {
+    // Parse primaryLight opacity
+    const plMatch = baseTheme.primaryLight?.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+    if (plMatch) primaryLightOpacity = parseFloat(plMatch[4]);
+    
+    // Parse primaryDark opacity
+    const pdMatch = baseTheme.primaryDark?.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+    if (pdMatch) primaryDarkOpacity = parseFloat(pdMatch[4]);
+    
+    // Parse gradient colors and opacities
+    const gradMatch = baseTheme.gradient?.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\).*rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+    if (gradMatch) {
+      gradientOpacity1 = parseFloat(gradMatch[4]);
+      gradientColor2 = rgbToHex(parseInt(gradMatch[5]), parseInt(gradMatch[6]), parseInt(gradMatch[7]));
+      gradientOpacity2 = parseFloat(gradMatch[8]);
+    }
+    
+    // Parse background colors and opacities
+    const bgMatch = baseTheme.background?.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\).*rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/);
+    if (bgMatch) {
+      bgColor1 = rgbToHex(parseInt(bgMatch[1]), parseInt(bgMatch[2]), parseInt(bgMatch[3]));
+      bgOpacity1 = parseFloat(bgMatch[4]);
+      bgColor2 = rgbToHex(parseInt(bgMatch[5]), parseInt(bgMatch[6]), parseInt(bgMatch[7]));
+      bgOpacity2 = parseFloat(bgMatch[8]);
+    }
+  }
+
+  // Generate preview theme
+  const getPreviewTheme = () => {
+    const rgb = hexToRgb(primaryColor);
+    const rgb2 = hexToRgb(gradientColor2);
+    const bgRgb1 = hexToRgb(bgColor1);
+    const bgRgb2 = hexToRgb(bgColor2);
+    return {
+      name: themeName,
+      primary: primaryColor,
+      primaryLight: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${primaryLightOpacity})`,
+      primaryDark: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${primaryDarkOpacity})`,
+      gradient: `linear-gradient(135deg, rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${gradientOpacity1}), rgba(${rgb2.r}, ${rgb2.g}, ${rgb2.b}, ${gradientOpacity2}))`,
+      accent: accentColor,
+      secondary: secondaryColor,
+      background: `linear-gradient(180deg, rgba(${bgRgb1.r}, ${bgRgb1.g}, ${bgRgb1.b}, ${bgOpacity1}) 0%, rgba(${bgRgb2.r}, ${bgRgb2.g}, ${bgRgb2.b}, ${bgOpacity2}) 100%)`
+    };
+  };
+
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  `;
+
+  // Main container - side by side layout
+  const container = document.createElement('div');
+  container.style.cssText = `
+    display: flex;
+    gap: 24px;
+    max-height: 90vh;
+    font-family: system-ui, -apple-system, sans-serif;
+  `;
+
+  // LEFT SIDE: Controls panel (plain styling)
+  const controlsPanel = document.createElement('div');
+  controlsPanel.className = 'flowpath-theme-editor-panel';
+  controlsPanel.style.cssText = `
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 12px;
+    padding: 24px;
+    width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+  `;
+
+  // RIGHT SIDE: Dummy node preview with ComfyUI-like background
+  const previewContainer = document.createElement('div');
+  previewContainer.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    background: #1e1e1e;
+    border-radius: 12px;
+    border: 1px solid #333;
+    min-width: 440px;
+  `;
+  
+  // Label above preview
+  const previewLabel = document.createElement('div');
+  previewLabel.textContent = 'Live Preview';
+  previewLabel.style.cssText = `
+    color: #888;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+  `;
+  previewContainer.appendChild(previewLabel);
+
+  // Create dummy FlowPath node - ComfyUI style frame
+  const dummyNode = document.createElement('div');
+  dummyNode.style.cssText = `
+    width: 380px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    background: #353535;
+  `;
+
+  // Node title bar (ComfyUI style - matches actual node chrome)
+  const nodeTitleBar = document.createElement('div');
+  nodeTitleBar.style.cssText = `
+    background: linear-gradient(180deg, #454545 0%, #353535 100%);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ddd;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  `;
+  nodeTitleBar.innerHTML = '<span style="font-size: 14px;">🌊</span> FlowPath';
+
+  // Node content area (the main container)
+  const nodeContent = document.createElement('div');
+  nodeContent.className = 'dummy-node-content';
+
+  // Output preview section (at top)
+  const outputPreview = document.createElement('div');
+  outputPreview.className = 'dummy-output-preview';
+  outputPreview.innerHTML = `
+    <div class="dummy-output-header">
+      <span class="dummy-output-icon">📁</span>
+      <span class="dummy-output-label">Output Preview</span>
+      <div class="dummy-mode-toggle">
+        <span class="dummy-mode-btn dummy-mode-active">SI</span>
+        <span class="dummy-mode-btn">IS</span>
+      </div>
+    </div>
+    <div class="dummy-output-path">
+      <span class="dummy-path-segment">output</span>
+      <span class="dummy-path-sep">/</span>
+      <span class="dummy-path-segment">Characters</span>
+      <span class="dummy-path-sep">/</span>
+      <span class="dummy-path-segment">Umbrael</span>
+      <span class="dummy-path-sep">/</span>
+      <span class="dummy-path-segment dummy-path-last">IllustriousXL</span>
+    </div>
+  `;
+
+  // Segments section header with arrow
+  const segmentsHeader = document.createElement('div');
+  segmentsHeader.className = 'dummy-section-header';
+  segmentsHeader.innerHTML = `
+    <span class="dummy-arrow">▼</span>
+    <span class="dummy-header-text">📋 Path Segments</span>
+  `;
+
+  // Segment rows with drag handle, toggle, icon, label
+  const createSegmentRow = (icon, label) => {
+    const row = document.createElement('div');
+    row.className = 'dummy-segment-row';
+    row.innerHTML = `
+      <span class="dummy-drag-handle">⋮⋮</span>
+      <span class="dummy-toggle"></span>
+      <span class="dummy-segment-icon">${icon}</span>
+      <span class="dummy-segment-label">${label}</span>
+    `;
+    return row;
+  };
+
+  const segmentRow1 = createSegmentRow('📂', 'Category');
+  const segmentRow2 = createSegmentRow('✏️', 'Name');
+  const segmentRow3 = createSegmentRow('🎯', 'Model');
+
+  // Add segment dropdown (matching real styling)
+  const addSegmentRow = document.createElement('div');
+  addSegmentRow.className = 'dummy-add-segment';
+  addSegmentRow.innerHTML = `
+    <span class="dummy-add-label">Add Segment:</span>
+    <span class="dummy-add-select">-- Select to add --</span>
+  `;
+
+  // Config section header (collapsed)
+  const configHeader = document.createElement('div');
+  configHeader.className = 'dummy-section-header';
+  configHeader.innerHTML = `
+    <span class="dummy-arrow">▶</span>
+    <span class="dummy-header-text">⚙️ Configuration</span>
+  `;
+
+  // Presets section header (collapsed)
+  const presetsHeader = document.createElement('div');
+  presetsHeader.className = 'dummy-section-header';
+  presetsHeader.innerHTML = `
+    <span class="dummy-arrow">▶</span>
+    <span class="dummy-header-text">💾 Presets</span>
+  `;
+
+  // Save Preset button
+  const savePresetBtn = document.createElement('div');
+  savePresetBtn.className = 'dummy-save-btn';
+  savePresetBtn.innerHTML = `💾 Save Current as Preset`;
+
+  // Filename preview section (shows secondary color usage)
+  const filenameSection = document.createElement('div');
+  filenameSection.className = 'dummy-filename-section';
+  filenameSection.innerHTML = `
+    <div class="dummy-filename-preview">
+      <span class="dummy-filename-label">Preview:</span>
+      <span class="dummy-filename-text">MyProject_001</span>
+    </div>
+    <div class="dummy-secondary-indicator">← Secondary color</div>
+  `;
+
+  // Donation banner - matches actual node exactly
+  const donationBanner = document.createElement('div');
+  donationBanner.className = 'dummy-banner';
+  donationBanner.innerHTML = `
+    <div class="dummy-banner-content">
+      <span class="dummy-banner-icon">💝</span>
+      <div class="dummy-banner-text">
+        <strong class="dummy-banner-title">FlowPath is free & open source!</strong><br>
+        <span class="dummy-banner-subtext">If you find it useful, consider </span><span class="dummy-banner-link">supporting development</span><span class="dummy-banner-subtext"> ☕</span>
+      </div>
+    </div>
+    <span class="dummy-banner-close">×</span>
+  `;
+
+  // Assemble dummy node
+  nodeContent.appendChild(outputPreview);
+  nodeContent.appendChild(segmentsHeader);
+  nodeContent.appendChild(segmentRow1);
+  nodeContent.appendChild(segmentRow2);
+  nodeContent.appendChild(segmentRow3);
+  nodeContent.appendChild(addSegmentRow);
+  nodeContent.appendChild(configHeader);
+  nodeContent.appendChild(filenameSection);
+  nodeContent.appendChild(presetsHeader);
+  nodeContent.appendChild(savePresetBtn);
+  nodeContent.appendChild(donationBanner);
+  dummyNode.appendChild(nodeTitleBar);
+  dummyNode.appendChild(nodeContent);
+  previewContainer.appendChild(dummyNode);
+
+  // Update dummy node styling to match real node exactly
+  const updateDummyNode = () => {
+    const t = getPreviewTheme();
+    
+    // Main container - uses background gradient (matches actual node)
+    nodeContent.style.cssText = `
+      background: ${t.background};
+      padding: 10px;
+      border: 1px solid ${t.primaryLight};
+      border-radius: 6px;
+      margin: 6px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    `;
+    
+    // Section headers - subtle gradient background
+    const headerStyle = `
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      background: ${t.gradient};
+      border-radius: 6px;
+      border: 1px solid ${t.primaryLight};
+      margin-bottom: 8px;
+      cursor: pointer;
+    `;
+    segmentsHeader.style.cssText = headerStyle;
+    configHeader.style.cssText = headerStyle + 'margin-top: 10px;';
+    presetsHeader.style.cssText = headerStyle;
+    
+    // Arrow styling - accent color
+    nodeContent.querySelectorAll('.dummy-arrow').forEach(arrow => {
+      arrow.style.cssText = `
+        margin-right: 8px;
+        font-size: 10px;
+        color: ${t.accent};
+      `;
+    });
+    
+    // Header text
+    nodeContent.querySelectorAll('.dummy-header-text').forEach(text => {
+      text.style.cssText = `
+        font-weight: 600;
+        color: #fff;
+        font-size: 13px;
+      `;
+    });
+    
+    // Segment rows - subtle gradient, not bright
+    const segmentRowStyle = `
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      margin: 3px 0;
+      background: ${t.gradient};
+      border-radius: 6px;
+      border: 1px solid ${t.primaryLight};
+    `;
+    segmentRow1.style.cssText = segmentRowStyle;
+    segmentRow2.style.cssText = segmentRowStyle;
+    segmentRow3.style.cssText = segmentRowStyle;
+    
+    // Drag handles
+    nodeContent.querySelectorAll('.dummy-drag-handle').forEach(handle => {
+      handle.style.cssText = `
+        margin-right: 8px;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 16px;
+      `;
+    });
+    
+    // Toggle boxes - accent color
+    nodeContent.querySelectorAll('.dummy-toggle').forEach(toggle => {
+      toggle.style.cssText = `
+        width: 12px;
+        height: 12px;
+        margin-right: 8px;
+        border-radius: 3px;
+        border: 2px solid ${t.accent};
+        background: ${t.accent};
+        flex-shrink: 0;
+      `;
+    });
+    
+    // Segment icons
+    nodeContent.querySelectorAll('.dummy-segment-icon').forEach(icon => {
+      icon.style.cssText = `
+        margin-right: 8px;
+        font-size: 16px;
+      `;
+    });
+    
+    // Segment labels
+    nodeContent.querySelectorAll('.dummy-segment-label').forEach(label => {
+      label.style.cssText = `
+        flex: 1;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 500;
+      `;
+    });
+    
+    // Add segment row - label + select style
+    addSegmentRow.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      margin-bottom: 8px;
+    `;
+    addSegmentRow.querySelector('.dummy-add-label').style.cssText = `
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 12px;
+      font-weight: 500;
+    `;
+    addSegmentRow.querySelector('.dummy-add-select').style.cssText = `
+      flex: 1;
+      padding: 6px 10px;
+      background: #1a1a1a;
+      border: 1px solid ${t.primaryLight};
+      border-radius: 6px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+    `;
+    
+    // Output preview
+    outputPreview.style.cssText = `
+      background: linear-gradient(135deg, rgba(0,0,0,0.4), rgba(0,0,0,0.3));
+      border: 1px solid ${t.primaryLight};
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    `;
+    outputPreview.querySelector('.dummy-output-header').style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    `;
+    outputPreview.querySelector('.dummy-output-icon').style.cssText = `
+      font-size: 16px;
+    `;
+    outputPreview.querySelector('.dummy-output-label').style.cssText = `
+      color: ${t.accent};
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    `;
+    outputPreview.querySelector('.dummy-mode-toggle').style.cssText = `
+      margin-left: auto;
+      display: flex;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+      padding: 2px;
+      border: 1px solid rgba(255,255,255,0.1);
+    `;
+    outputPreview.querySelectorAll('.dummy-mode-btn').forEach((btn, i) => {
+      const isActive = btn.classList.contains('dummy-mode-active');
+      btn.style.cssText = `
+        padding: 3px 6px;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: 3px;
+        background: ${isActive ? t.accent : 'rgba(0,0,0,0.2)'};
+        color: ${isActive ? getContrastColor(t.accent) : 'rgba(255,255,255,0.6)'};
+      `;
+    });
+    outputPreview.querySelector('.dummy-output-path').style.cssText = `
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.05);
+      line-height: 1.6;
+    `;
+    outputPreview.querySelectorAll('.dummy-path-segment').forEach(seg => {
+      seg.style.cssText = `color: #fff;`;
+    });
+    outputPreview.querySelector('.dummy-path-last').style.fontWeight = '600';
+    outputPreview.querySelectorAll('.dummy-path-sep').forEach(sep => {
+      sep.style.cssText = `color: ${t.accent}; opacity: 0.7;`;
+    });
+    
+    // Save preset button - green gradient
+    savePresetBtn.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(16, 185, 129, 0.3));
+      border: 1px solid rgba(34, 197, 94, 0.6);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+    `;
+    
+    // Filename section - shows secondary color usage (matches actual node)
+    filenameSection.style.cssText = `
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      border-left: 3px solid ${t.secondary};
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+    `;
+    filenameSection.querySelector('.dummy-filename-preview').style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    `;
+    filenameSection.querySelector('.dummy-filename-label').style.cssText = `
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 11px;
+    `;
+    filenameSection.querySelector('.dummy-filename-text').style.cssText = `
+      color: #fff;
+      font-size: 11px;
+    `;
+    filenameSection.querySelector('.dummy-secondary-indicator').style.cssText = `
+      color: ${t.secondary};
+      font-size: 9px;
+      font-family: system-ui, sans-serif;
+      margin-top: 4px;
+      opacity: 0.8;
+    `;
+
+    // Donation banner - matches actual node styling
+    const bannerGradient = `linear-gradient(135deg, ${t.primaryLight}, ${t.primaryDark.replace(/[\d.]+\)$/, '0.25)')})`;
+    donationBanner.style.cssText = `
+      margin-top: 12px;
+      padding: 12px;
+      background: ${bannerGradient};
+      border: 1px solid ${t.primary};
+      border-radius: 8px;
+      position: relative;
+    `;
+    donationBanner.querySelector('.dummy-banner-content').style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    `;
+    donationBanner.querySelector('.dummy-banner-icon').style.cssText = `
+      font-size: 20px;
+    `;
+    donationBanner.querySelector('.dummy-banner-text').style.cssText = `
+      flex: 1;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 12px;
+      line-height: 1.4;
+    `;
+    donationBanner.querySelector('.dummy-banner-title').style.cssText = `
+      color: ${t.accent};
+    `;
+    donationBanner.querySelector('.dummy-banner-subtext').style.cssText = `
+      color: rgba(255, 255, 255, 0.9);
+    `;
+    donationBanner.querySelectorAll('.dummy-banner-subtext').forEach(el => {
+      el.style.cssText = `color: rgba(255, 255, 255, 0.9);`;
+    });
+    donationBanner.querySelector('.dummy-banner-link').style.cssText = `
+      color: ${t.accent};
+      text-decoration: underline;
+    `;
+    donationBanner.querySelector('.dummy-banner-close').style.cssText = `
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+      cursor: pointer;
+    `;
+    
+    // Node frame border - matches ComfyUI node chrome, not the inner content
+    dummyNode.style.border = `1px solid #2a2a2a`;
+  };
+
+  // Helper: create color row
+  const createColorRow = (label, initialValue, onChange) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px;';
+    
+    const labelEl = document.createElement('label');
+    labelEl.textContent = label;
+    labelEl.style.cssText = 'width: 120px; color: #ccc; font-size: 12px;';
+    
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = initialValue;
+    colorInput.style.cssText = 'width: 40px; height: 28px; border: 1px solid #555; border-radius: 4px; cursor: pointer; background: transparent;';
+    
+    const hexInput = document.createElement('input');
+    hexInput.type = 'text';
+    hexInput.value = initialValue;
+    hexInput.style.cssText = 'width: 80px; padding: 6px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; color: #fff; font-family: monospace; font-size: 12px;';
+    
+    colorInput.oninput = () => { hexInput.value = colorInput.value; onChange(colorInput.value); updateDummyNode(); };
+    hexInput.oninput = () => { if (/^#[0-9a-f]{6}$/i.test(hexInput.value)) { colorInput.value = hexInput.value; onChange(hexInput.value); updateDummyNode(); }};
+    
+    row.appendChild(labelEl);
+    row.appendChild(colorInput);
+    row.appendChild(hexInput);
+    return row;
+  };
+
+  // Helper: create slider row
+  const createSliderRow = (label, initialValue, min, max, step, onChange) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px;';
+    
+    const labelEl = document.createElement('label');
+    labelEl.textContent = label;
+    labelEl.style.cssText = 'width: 120px; color: #ccc; font-size: 12px;';
+    
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = min; slider.max = max; slider.step = step; slider.value = initialValue;
+    slider.style.cssText = 'flex: 1; cursor: pointer;';
+    
+    const valueDisplay = document.createElement('span');
+    valueDisplay.textContent = initialValue;
+    valueDisplay.style.cssText = 'width: 40px; color: #999; font-size: 12px; text-align: right;';
+    
+    slider.oninput = () => { valueDisplay.textContent = slider.value; onChange(parseFloat(slider.value)); updateDummyNode(); };
+    
+    row.appendChild(labelEl);
+    row.appendChild(slider);
+    row.appendChild(valueDisplay);
+    return row;
+  };
+
+  // Build controls panel
+  const title = document.createElement('h2');
+  title.textContent = isEditing ? 'Edit Theme' : 'Create Custom Theme';
+  title.style.cssText = 'margin: 0 0 16px 0; color: #fff; font-size: 18px; font-weight: 600;';
+  controlsPanel.appendChild(title);
+
+  // Theme name
+  const nameRow = document.createElement('div');
+  nameRow.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 16px;';
+  const nameLabel = document.createElement('label');
+  nameLabel.textContent = 'Theme Name';
+  nameLabel.style.cssText = 'width: 120px; color: #ccc; font-size: 12px;';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = themeName;
+  nameInput.maxLength = 24; // Limit theme name length
+  nameInput.placeholder = 'Max 24 characters';
+  nameInput.style.cssText = 'flex: 1; padding: 8px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; color: #fff; font-size: 13px;';
+  nameInput.oninput = () => { themeName = nameInput.value; };
+  nameRow.appendChild(nameLabel);
+  nameRow.appendChild(nameInput);
+  controlsPanel.appendChild(nameRow);
+
+  // Section: Colors
+  const colorsTitle = document.createElement('div');
+  colorsTitle.textContent = 'Colors';
+  colorsTitle.style.cssText = 'color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 10px 0; padding-top: 12px; border-top: 1px solid #333;';
+  controlsPanel.appendChild(colorsTitle);
+
+  controlsPanel.appendChild(createColorRow('Primary', primaryColor, (v) => { primaryColor = v; }));
+  controlsPanel.appendChild(createColorRow('Accent', accentColor, (v) => { accentColor = v; gradientColor2 = v; }));
+  controlsPanel.appendChild(createColorRow('Secondary', secondaryColor, (v) => { secondaryColor = v; }));
+
+  // Section: Background
+  const bgSection = document.createElement('div');
+  bgSection.textContent = 'Background';
+  bgSection.style.cssText = 'color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 10px 0; padding-top: 12px; border-top: 1px solid #333;';
+  controlsPanel.appendChild(bgSection);
+
+  controlsPanel.appendChild(createColorRow('Top Color', bgColor1, (v) => { bgColor1 = v; }));
+  controlsPanel.appendChild(createColorRow('Bottom Color', bgColor2, (v) => { bgColor2 = v; }));
+  controlsPanel.appendChild(createSliderRow('Top Opacity', bgOpacity1, 0.2, 1.0, 0.05, (v) => { bgOpacity1 = v; }));
+  controlsPanel.appendChild(createSliderRow('Bottom Opacity', bgOpacity2, 0.1, 0.8, 0.05, (v) => { bgOpacity2 = v; }));
+
+  // Section: Opacity
+  const opacitySection = document.createElement('div');
+  opacitySection.textContent = 'Element Opacity';
+  opacitySection.style.cssText = 'color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 10px 0; padding-top: 12px; border-top: 1px solid #333;';
+  controlsPanel.appendChild(opacitySection);
+
+  controlsPanel.appendChild(createSliderRow('Border Light', primaryLightOpacity, 0.1, 0.8, 0.05, (v) => { primaryLightOpacity = v; }));
+  controlsPanel.appendChild(createSliderRow('Border Dark', primaryDarkOpacity, 0.2, 1.0, 0.05, (v) => { primaryDarkOpacity = v; }));
+  controlsPanel.appendChild(createSliderRow('Gradient Start', gradientOpacity1, 0.05, 0.5, 0.05, (v) => { gradientOpacity1 = v; }));
+  controlsPanel.appendChild(createSliderRow('Gradient End', gradientOpacity2, 0.02, 0.3, 0.02, (v) => { gradientOpacity2 = v; }));
+
+  // Buttons
+  const buttonRow = document.createElement('div');
+  buttonRow.style.cssText = 'display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #333;';
+
+  if (isEditing) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.style.cssText = 'padding: 10px 16px; background: transparent; border: 1px solid #ef4444; border-radius: 6px; color: #ef4444; font-size: 13px; cursor: pointer; transition: all 0.2s;';
+    deleteBtn.onmouseover = () => { deleteBtn.style.background = 'rgba(239,68,68,0.1)'; };
+    deleteBtn.onmouseout = () => { deleteBtn.style.background = 'transparent'; };
+    deleteBtn.onclick = () => {
+      if (confirm(`Delete theme "${themeName}"?`)) {
+        delete customThemes[existingThemeKey];
+        saveCustomThemes();
+        globalSettings.theme = 'umbrael';
+        app.graph._nodes.filter(n => n.comfyClass === "FlowPath").forEach(n => n.genSortRender?.());
+        showToast('Theme deleted', 'success');
+        overlay.remove();
+      }
+    };
+    buttonRow.appendChild(deleteBtn);
+  }
+
+  const spacer = document.createElement('div');
+  spacer.style.flex = '1';
+  buttonRow.appendChild(spacer);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = 'padding: 10px 20px; background: transparent; border: 1px solid #555; border-radius: 6px; color: #aaa; font-size: 13px; cursor: pointer; transition: all 0.2s;';
+  cancelBtn.onmouseover = () => { cancelBtn.style.borderColor = '#777'; cancelBtn.style.color = '#fff'; };
+  cancelBtn.onmouseout = () => { cancelBtn.style.borderColor = '#555'; cancelBtn.style.color = '#aaa'; };
+  cancelBtn.onclick = () => overlay.remove();
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = isEditing ? 'Update Theme' : 'Save Theme';
+  saveBtn.style.cssText = 'padding: 10px 20px; background: #10b981; border: none; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;';
+  saveBtn.onmouseover = () => { saveBtn.style.background = '#059669'; };
+  saveBtn.onmouseout = () => { saveBtn.style.background = '#10b981'; };
+  saveBtn.onclick = () => {
+    if (!themeName.trim()) {
+      // Flash name input red
+      nameInput.style.borderColor = '#ef4444';
+      nameInput.style.background = 'rgba(239, 68, 68, 0.15)';
+      setTimeout(() => {
+        nameInput.style.borderColor = '#444';
+        nameInput.style.background = '#1a1a1a';
+      }, 300);
+      return;
+    }
+    
+    // Limit custom themes to 10
+    const MAX_CUSTOM_THEMES = 10;
+    const currentCount = Object.keys(customThemes).length;
+    if (!isEditing && currentCount >= MAX_CUSTOM_THEMES) {
+      // Flash save button red
+      saveBtn.style.background = '#ef4444';
+      saveBtn.textContent = 'Limit reached!';
+      setTimeout(() => {
+        saveBtn.style.background = '#10b981';
+        saveBtn.textContent = 'Save Theme';
+      }, 1000);
+      return;
+    }
+    
+    const themeKey = isEditing ? existingThemeKey : 'custom_' + Date.now();
+    customThemes[themeKey] = getPreviewTheme();
+    saveCustomThemes();
+    globalSettings.theme = themeKey;
+    app.ui.settings.setSettingValue("🌊 FlowPath.Theme", themeKey);
+    app.graph._nodes.filter(n => n.comfyClass === "FlowPath").forEach(n => n.genSortRender?.());
+    overlay.remove();
+  };
+
+  buttonRow.appendChild(cancelBtn);
+  buttonRow.appendChild(saveBtn);
+  controlsPanel.appendChild(buttonRow);
+
+  // Assemble
+  container.appendChild(controlsPanel);
+  container.appendChild(previewContainer);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+
+  // Initial update
+  updateDummyNode();
+
+  // Close handlers
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const escHandler = (e) => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }};
+  document.addEventListener('keydown', escHandler);
+}
+
 // Global settings storage
 let globalSettings = {
   theme: "umbrael",
@@ -123,8 +995,167 @@ if (!document.getElementById('gensort-pro-styles')) {
     .gensort-pro-select option:checked {
       background: #2a2a2a !important;
     }
+    
+    /* FlowPath Theme Dropdown - base styles, colors applied inline */
+    .flowpath-theme-dropdown {
+      position: fixed;
+      z-index: 10000;
+      min-width: 180px;
+      max-height: 280px;
+      overflow-y: auto;
+      background: rgba(20, 20, 28, 0.98);
+      border-radius: 6px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      padding: 4px 0;
+    }
+    
+    .flowpath-theme-dropdown-title {
+      padding: 6px 10px;
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .flowpath-theme-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      gap: 8px;
+    }
+    
+    .flowpath-theme-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .flowpath-theme-item.active {
+      background: rgba(34, 197, 94, 0.15);
+      border-left-color: #22c55e;
+    }
+    
+    .flowpath-theme-item.active:hover {
+      background: rgba(34, 197, 94, 0.25);
+    }
+    
+    .flowpath-theme-item-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+    
+    .flowpath-theme-item-name {
+      flex: 1;
+      font-weight: 500;
+    }
+    
+    .flowpath-theme-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+      margin: 4px 0;
+    }
+    
+    .flowpath-theme-create {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      cursor: pointer;
+      transition: all 0.15s;
+      gap: 8px;
+    }
+    
+    .flowpath-theme-create:hover {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
   `;
   document.head.appendChild(style);
+}
+
+// Themed scrollbar styling - updates dynamically with theme changes
+function updateThemedScrollbar(theme) {
+  let scrollbarStyle = document.getElementById('flowpath-scrollbar-styles');
+  if (!scrollbarStyle) {
+    scrollbarStyle = document.createElement('style');
+    scrollbarStyle.id = 'flowpath-scrollbar-styles';
+    document.head.appendChild(scrollbarStyle);
+  }
+  
+  // Extract colors from theme
+  const primary = theme.primary || '#9333ea';
+  const primaryLight = theme.primaryLight || 'rgba(147, 51, 234, 0.3)';
+  const primaryDark = theme.primaryDark || 'rgba(147, 51, 234, 0.6)';
+  const accent = theme.accent || '#fbbf24';
+  
+  scrollbarStyle.textContent = `
+    /* FlowPath themed scrollbar */
+    .gensort-pro-container::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+    
+    .gensort-pro-container::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+      margin: 2px;
+    }
+    
+    .gensort-pro-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: background 0.2s;
+    }
+    
+    .gensort-pro-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+    
+    .gensort-pro-container::-webkit-scrollbar-thumb:active {
+      background: rgba(255, 255, 255, 0.35);
+    }
+    
+    .gensort-pro-container::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+    
+    /* Firefox scrollbar */
+    .gensort-pro-container {
+      scrollbar-width: auto;
+      scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.03);
+    }
+    
+    /* Theme editor scrollbar */
+    .flowpath-theme-editor-panel::-webkit-scrollbar {
+      width: 12px;
+    }
+    
+    .flowpath-theme-editor-panel::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+    }
+    
+    .flowpath-theme-editor-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .flowpath-theme-editor-panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+  `;
 }
 
 
@@ -141,10 +1172,11 @@ function showToast(message, type = "info", duration = 3000) {
   
   const style = colors[type] || colors.info;
   
+  // Security: escape user-controlled content to prevent XSS
   toast.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px;">
       <span style="font-size: 18px;">${style.icon}</span>
-      <span style="flex: 1;">${message}</span>
+      <span style="flex: 1;">${escapeHtml(message)}</span>
     </div>
   `;
   
@@ -213,6 +1245,80 @@ function showToast(message, type = "info", duration = 3000) {
 }
 
 // Detection helper functions (defined outside extension for accessibility)
+
+/**
+ * Recursively collect all nodes from a graph, including nodes inside subgraphs/group nodes.
+ * This enables auto-detection to work with workflows that use Group Nodes.
+ * @param {Object} graph - The LiteGraph graph object
+ * @returns {Array} - Flat array of all nodes including nested ones
+ */
+function getAllNodesIncludingSubgraphs(graph) {
+  if (!graph || !graph._nodes) {
+    return [];
+  }
+  
+  const allNodes = [];
+  const visitedNodes = new Set();  // Prevent infinite recursion from circular references
+  const visitedGraphs = new Set(); // Track visited graphs to avoid cycles
+  
+  function collectNodes(nodes, currentGraph) {
+    if (!nodes || !Array.isArray(nodes)) return;
+    
+    for (const node of nodes) {
+      // Skip if we've already visited this node (cycle detection)
+      if (!node || visitedNodes.has(node)) continue;
+      visitedNodes.add(node);
+      
+      allNodes.push(node);
+      
+      // Check for subgraph/group node patterns used by ComfyUI
+      // Pattern 1: node.subgraph (some group node implementations)
+      if (node.subgraph && node.subgraph._nodes && !visitedGraphs.has(node.subgraph)) {
+        visitedGraphs.add(node.subgraph);
+        collectNodes(node.subgraph._nodes, node.subgraph);
+      }
+      
+      // Pattern 2: node.getInnerNodes() method (ComfyUI group nodes / subgraphs)
+      if (typeof node.getInnerNodes === 'function') {
+        try {
+          const innerNodes = node.getInnerNodes();
+          if (Array.isArray(innerNodes) && innerNodes.length > 0) {
+            collectNodes(innerNodes, currentGraph);
+          }
+        } catch (e) {
+          // Silently ignore if method fails
+        }
+      }
+      
+      // Pattern 3: ComfyUI's GroupNode with inner_nodes array
+      if (node.inner_nodes && Array.isArray(node.inner_nodes)) {
+        collectNodes(node.inner_nodes, currentGraph);
+      }
+      
+      // Pattern 4: Check for serialized group node data (workflow/ prefixed nodes)
+      if (node.type && node.type.startsWith("workflow/")) {
+        // Try getNonRecursiveInnerNodes first (safer, no recursion into nested groups)
+        if (typeof node.getNonRecursiveInnerNodes === 'function') {
+          try {
+            const innerNodes = node.getNonRecursiveInnerNodes();
+            if (Array.isArray(innerNodes) && innerNodes.length > 0) {
+              collectNodes(innerNodes, currentGraph);
+            }
+          } catch (e) {
+            // Silently ignore
+          }
+        }
+      }
+      
+      // Note: We deliberately skip node.graph to avoid circular references back to parent
+    }
+  }
+  
+  visitedGraphs.add(graph);
+  collectNodes(graph._nodes, graph);
+  return allNodes;
+}
+
 function detectModelFromWorkflow(graph) {
   
   if (!graph || !graph._nodes) {
@@ -230,10 +1336,13 @@ function detectModelFromWorkflow(graph) {
   ];
 
   const foundModels = [];
+  
+  // Get all nodes including those inside subgraphs/group nodes
+  const allNodes = getAllNodesIncludingSubgraphs(graph);
 
   // Search for all checkpoint nodes
-  for (const node of graph._nodes) {
-    if (checkpointNodeTypes.includes(node.type)) {
+  for (const node of allNodes) {
+    if (checkpointNodeTypes.includes(node.type) || checkpointNodeTypes.includes(node.comfyClass)) {
       // Find the widget that contains the model name
       const ckptWidget = node.widgets?.find(w => 
         w.name === "ckpt_name" || w.name === "unet_name" || w.name === "model_name"
@@ -287,10 +1396,14 @@ function detectSeedFromWorkflow(graph) {
     "RandomNoise",
     "DisableNoise"
   ];
+  
+  // Get all nodes including those inside subgraphs/group nodes
+  const allNodes = getAllNodesIncludingSubgraphs(graph);
 
   // First, check for noise generator nodes (higher priority for SamplerCustomAdvanced workflows)
-  for (const node of graph._nodes) {
-    if (noiseGeneratorTypes.some(type => node.type.includes(type) || type.includes(node.type))) {
+  for (const node of allNodes) {
+    const nodeType = node.type || node.comfyClass || '';
+    if (noiseGeneratorTypes.some(type => nodeType.includes(type) || type.includes(nodeType))) {
       // Find the widget that contains the noise_seed
       const seedWidget = node.widgets?.find(w => w.name === "noise_seed");
       
@@ -302,8 +1415,9 @@ function detectSeedFromWorkflow(graph) {
   }
 
   // Search for sampler nodes (fallback)
-  for (const node of graph._nodes) {
-    if (samplerNodeTypes.some(type => node.type.includes(type) || type.includes(node.type))) {
+  for (const node of allNodes) {
+    const nodeType = node.type || node.comfyClass || '';
+    if (samplerNodeTypes.some(type => nodeType.includes(type) || type.includes(nodeType))) {
       // Find the widget that contains the seed
       const seedWidget = node.widgets?.find(w => w.name === "seed");
       
@@ -332,9 +1446,12 @@ function detectLorasFromWorkflow(graph) {
   
   // LoRA Manager pattern: <lora:name:strength> or <lora:name:strength:clip>
   const LORA_PATTERN = /<lora:([^:>]+):([-\d\.]+)(?::([-\d\.]+))?>/g;
+  
+  // Get all nodes including those inside subgraphs/group nodes
+  const allNodes = getAllNodesIncludingSubgraphs(graph);
 
   // Search for all nodes in the workflow
-  for (const node of graph._nodes) {
+  for (const node of allNodes) {
     
     // Handle Lora Manager nodes specially
     if (node.type === "Lora Loader (LoraManager)" || 
@@ -516,9 +1633,12 @@ function detectResolutionFromWorkflow(graph) {
   ];
 
   const foundResolutions = [];
+  
+  // Get all nodes including those inside subgraphs/group nodes
+  const allNodes = getAllNodesIncludingSubgraphs(graph);
 
   // Search for all latent image nodes
-  for (const node of graph._nodes) {
+  for (const node of allNodes) {
     if (latentNodeTypes.some(type => node.type === type || node.comfyClass === type)) {
       
       // Try to find width and height widgets
@@ -551,23 +1671,43 @@ app.registerExtension({
   name: "FlowPath.BuilderWidget",
 
   async setup() {
+    // Build theme options dynamically (built-in + custom)
+    const getThemeOptions = () => {
+      const options = [
+        { value: "ocean", text: "🌊 Ocean Blue" },
+        { value: "forest", text: "🌲 Forest Green" },
+        { value: "pinkpony", text: "🎠 Pink Pony Club" },
+        { value: "odie", text: "🧡 Odie" },
+        { value: "umbrael", text: "💜 Umbrael's Umbrage" },
+        { value: "plainjane", text: "⚪ Plain Jane" },
+        { value: "batman", text: "🦇 The Dark Knight" }
+      ];
+      
+      // Add custom themes
+      const customKeys = Object.keys(customThemes);
+      if (customKeys.length > 0) {
+        options.push({ value: "_divider", text: "─── Custom Themes ───", disabled: true });
+        customKeys.forEach(key => {
+          options.push({ value: key, text: "✨ " + customThemes[key].name });
+        });
+      }
+      
+      return options;
+    };
+
     // Add theme setting to ComfyUI's settings menu
+    // To create/edit themes, right-click the FlowPath node
     app.ui.settings.addSetting({
       id: "🌊 FlowPath.Theme",
       name: "Theme",
       type: "combo",
-      tooltip: "Choose a color theme for the FlowPath node. Each theme has unique colors and gradients.",
-      options: [
-        { value: "ocean", text: "Ocean Blue" },
-        { value: "forest", text: "Forest Green" },
-        { value: "pinkpony", text: "Pink Pony Club" },
-        { value: "odie", text: "Odie" },
-        { value: "umbrael", text: "Umbrael's Umbrage" },
-        { value: "plainjane", text: "Plain Jane" },
-        { value: "batman", text: "The Dark Knight" }
-      ],
+      tooltip: "Choose a color theme for the FlowPath node. Right-click the node to create or edit custom themes.",
+      options: getThemeOptions(),
       defaultValue: "umbrael",
       onChange: (value) => {
+        // Ignore divider selection
+        if (value === "_divider") return;
+        
         globalSettings.theme = value;
         
         // Trigger re-render of all FlowPath nodes
@@ -730,6 +1870,26 @@ app.registerExtension({
 
   async beforeRegisterNodeDef(nodeType, nodeData, app) {
     if (nodeType.comfyClass === "FlowPath") {
+      // Add right-click context menu option for theme editor
+      chainCallback(nodeType.prototype, "getExtraMenuOptions", function(_, options) {
+        const currentThemeKey = globalSettings.theme || 'umbrael';
+        const isCustomTheme = currentThemeKey.startsWith('custom_');
+        
+        options.unshift(
+          {
+            content: isCustomTheme ? "🎨 Edit Current Theme" : "🎨 Create Custom Theme",
+            callback: () => {
+              if (isCustomTheme) {
+                openThemeEditor(currentThemeKey);
+              } else {
+                openThemeEditor();
+              }
+            }
+          },
+          null // Separator
+        );
+      });
+
       chainCallback(nodeType.prototype, "onNodeCreated", function () {
 
         const node = this;
@@ -921,10 +2081,24 @@ app.registerExtension({
           try {
             const stored = localStorage.getItem(GLOBAL_PRESETS_KEY);
             if (stored) {
-              return JSON.parse(stored);
+              const parsed = JSON.parse(stored);
+              // Security: Validate structure - should be an object with preset objects as values
+              if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                const validated = {};
+                for (const [key, preset] of Object.entries(parsed)) {
+                  // Validate each preset has expected structure
+                  if (isValidPresetObject(preset)) {
+                    validated[key] = preset;
+                  } else {
+                    console.warn(`[FlowPath] Invalid preset "${key}" - skipping`);
+                  }
+                }
+                return validated;
+              }
             }
           } catch (e) {
-            console.warn("[FlowPath] Failed to load global presets from localStorage:", e);
+            console.warn("[FlowPath] Failed to load global presets from localStorage, resetting:", e);
+            localStorage.removeItem(GLOBAL_PRESETS_KEY);
           }
           return {};
         };
@@ -1198,8 +2372,8 @@ app.registerExtension({
           clearDropIndicator();
         }, true);
 
-        // Get current theme from global settings
-        const getTheme = () => THEMES[globalSettings.theme] || THEMES.umbrael;
+        // Get current theme from global settings (includes custom themes)
+        const getTheme = () => getAllThemes()[globalSettings.theme] || THEMES.umbrael;
 
         // Template variable replacement function
         // showPlaceholders: true = show [placeholder], false = show empty string
@@ -1506,7 +2680,8 @@ app.registerExtension({
               font-size: 12px;
               line-height: 1.4;
             `;
-            warningEl.innerHTML = warningMessage ? `⚠️ ${warningMessage}` : '';
+            // Security: escape content to prevent XSS (defense in depth)
+            warningEl.innerHTML = warningMessage ? `⚠️ ${escapeHtml(warningMessage)}` : '';
             dialog.appendChild(warningEl);
 
             const input = document.createElement("input");
@@ -1911,6 +3086,9 @@ app.registerExtension({
         const renderUI = () => {
           const theme = getTheme();
           
+          // Update themed scrollbar CSS
+          updateThemedScrollbar(theme);
+          
           // Clear config input references (will be repopulated during render)
           configInputElements = {};
           
@@ -2035,9 +3213,10 @@ app.registerExtension({
              // When empty: SI mode shows "ComfyUI" (filename prefix), IS mode shows just "output"
              const emptyDefault = isImageSaverMode ? ['output'] : ['output', 'ComfyUI'];
              const pathParts = previewPath ? ['output', ...previewPath.split(' / ')] : emptyDefault;
+            // Security: escape user-controlled path parts to prevent XSS
             const breadcrumbHtml = pathParts.map((part, i) => {
                 const isLast = i === pathParts.length - 1;
-                return `<span style="color: #fff; font-weight: ${isLast ? '600' : '400'};">${part}</span>`;
+                return `<span style="color: #fff; font-weight: ${isLast ? '600' : '400'};">${escapeHtml(part)}</span>`;
               }).join(`<span style="color: ${theme.accent}; opacity: 0.7;">/</span>`);
             
             let html = "";
@@ -2095,6 +3274,17 @@ app.registerExtension({
                      background: ${imageSaverActive ? (theme.accent || '#d97706') : 'rgba(0,0,0,0.2)'};
                      color: ${imageSaverActive ? '#000' : 'rgba(255,255,255,0.6)'};
                    " title="Image Saver mode: Separate path and filename">IS</button>
+                   <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.2); margin: 0 3px;"></div>
+                   <button class="theme-dropdown-btn" style="
+                      padding: 3px 6px;
+                      font-size: 10px;
+                      border: none;
+                      border-radius: 3px;
+                      cursor: pointer;
+                      transition: all 0.2s;
+                      background: rgba(0,0,0,0.2);
+                      color: rgba(255,255,255,0.6);
+                    " title="Theme settings">⚙</button>
                 </div>
               </div>
             </div>`;
@@ -2105,8 +3295,9 @@ app.registerExtension({
               const hasCounter = config.filename_template && 
                 (config.filename_template.includes('%counter') || config.filename_template.toLowerCase().includes('{counter}'));
               const counterSuffix = hasCounter ? '.[ext]' : '_##.[ext]';
+              // Security: escape user-controlled filename template to prevent XSS
               const filenameDisplay = hasFilenameTemplate 
-                ? `<span style="color: #fff; font-weight: 600;">${filenamePreviewStr || config.filename_template}</span><span style="color: rgba(255,255,255,0.3);">${counterSuffix}</span>`
+                ? `<span style="color: #fff; font-weight: 600;">${escapeHtml(filenamePreviewStr || config.filename_template)}</span><span style="color: rgba(255,255,255,0.3);">${counterSuffix}</span>`
                 : `<span style="color: rgba(255,255,255,0.4); font-style: italic;">&lt;filename&gt;</span><span style="color: rgba(255,255,255,0.3);">_##.[ext]</span>`;
               
               html += `<div class="path-string-container" style="
@@ -2169,10 +3360,343 @@ app.registerExtension({
           `;
           
           
+          // Helper to open theme dropdown
+          const openThemeDropdown = (targetBtn) => {
+            // Check if dropdown already exists (toggle behavior)
+            const existingDropdown = document.querySelector('.flowpath-theme-dropdown');
+            if (existingDropdown) {
+              existingDropdown.remove();
+              return;
+            }
+            
+            const dropdown = document.createElement('div');
+            dropdown.className = 'flowpath-theme-dropdown';
+            
+            // Apply solid background to dropdown (not transparent)
+            dropdown.style.cssText = `
+              position: fixed;
+              z-index: 10000;
+              min-width: 180px;
+              max-height: 280px;
+              overflow-y: auto;
+              background: #1a1a1f;
+              border: 1px solid ${theme.primary};
+              border-radius: 6px;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.05);
+              padding: 4px 0;
+              scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.03);
+            `;
+            
+            // Add themed scrollbar via inline style element (subtle glass style)
+            const scrollStyle = document.createElement('style');
+            scrollStyle.textContent = `
+              .flowpath-theme-dropdown::-webkit-scrollbar {
+                width: 10px;
+              }
+              .flowpath-theme-dropdown::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 5px;
+              }
+              .flowpath-theme-dropdown::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.18);
+                border-radius: 5px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+              }
+              .flowpath-theme-dropdown::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.28);
+              }
+            `;
+            dropdown.appendChild(scrollStyle);
+            
+            // Title
+            const title = document.createElement('div');
+            title.className = 'flowpath-theme-dropdown-title';
+            title.style.cssText = `
+              padding: 6px 10px;
+              font-size: 9px;
+              font-weight: 600;
+              color: ${theme.accent};
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              border-bottom: 1px solid ${theme.primaryLight};
+            `;
+            title.textContent = 'Select Theme';
+            dropdown.appendChild(title);
+            
+            // Get all themes
+            const allThemes = getAllThemes();
+            const currentThemeKey = globalSettings.theme || 'umbrael';
+            
+            // Built-in themes first (no emojis - swatch shows color)
+            const builtInThemes = [
+              { key: 'ocean', name: 'Ocean Blue' },
+              { key: 'forest', name: 'Forest Green' },
+              { key: 'pinkpony', name: 'Pink Pony Club' },
+              { key: 'odie', name: 'Odie' },
+              { key: 'umbrael', name: 'Umbrael\'s Umbrage' },
+              { key: 'plainjane', name: 'Plain Jane' },
+              { key: 'batman', name: 'The Dark Knight' }
+            ];
+            
+            builtInThemes.forEach(({ key, name }) => {
+              const themeData = allThemes[key];
+              if (!themeData) return;
+              
+              const item = document.createElement('div');
+              item.className = 'flowpath-theme-item' + (currentThemeKey === key ? ' active' : '');
+              
+              const swatch = document.createElement('div');
+              swatch.className = 'flowpath-theme-item-swatch';
+              swatch.style.background = `linear-gradient(135deg, ${themeData.primary}, ${themeData.accent})`;
+              
+              const nameEl = document.createElement('span');
+              nameEl.className = 'flowpath-theme-item-name';
+              nameEl.textContent = name;
+              
+              item.appendChild(swatch);
+              item.appendChild(nameEl);
+              
+              // Hover effect using theme color
+              item.onmouseenter = () => {
+                if (currentThemeKey !== key) {
+                  item.style.background = theme.primaryLight;
+                }
+              };
+              item.onmouseleave = () => {
+                if (currentThemeKey !== key) {
+                  item.style.background = '';
+                }
+              };
+              
+              item.onclick = () => {
+                globalSettings.theme = key;
+                app.ui.settings.setSettingValue("🌊 FlowPath.Theme", key);
+                app.graph._nodes.filter(n => n.comfyClass === "FlowPath").forEach(n => n.genSortRender?.());
+                dropdown.remove();
+              };
+              
+              dropdown.appendChild(item);
+            });
+            
+            // Custom themes
+            const customKeys = Object.keys(customThemes);
+            if (customKeys.length > 0) {
+              const divider = document.createElement('div');
+              divider.className = 'flowpath-theme-divider';
+              divider.style.cssText = `height: 1px; background: ${theme.primaryLight}; margin: 4px 0;`;
+              dropdown.appendChild(divider);
+              
+              customKeys.forEach(key => {
+                const themeData = customThemes[key];
+                const item = document.createElement('div');
+                item.className = 'flowpath-theme-item' + (currentThemeKey === key ? ' active' : '');
+                item.style.position = 'relative';
+                
+                const swatch = document.createElement('div');
+                swatch.className = 'flowpath-theme-item-swatch';
+                swatch.style.background = `linear-gradient(135deg, ${themeData.primary}, ${themeData.accent})`;
+                
+                const nameEl = document.createElement('span');
+                nameEl.className = 'flowpath-theme-item-name';
+                nameEl.textContent = themeData.name;
+                
+                // Delete button for custom themes
+                const deleteBtn = document.createElement('div');
+                deleteBtn.className = 'flowpath-theme-delete';
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.style.cssText = `
+                  position: absolute;
+                  right: 8px;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  width: 18px;
+                  height: 18px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  border-radius: 4px;
+                  font-size: 14px;
+                  color: rgba(255,255,255,0.4);
+                  cursor: pointer;
+                  opacity: 0;
+                  transition: opacity 0.15s, background 0.15s, color 0.15s;
+                `;
+                
+                deleteBtn.onmouseenter = () => {
+                  deleteBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+                  deleteBtn.style.color = '#ef4444';
+                };
+                deleteBtn.onmouseleave = () => {
+                  deleteBtn.style.background = '';
+                  deleteBtn.style.color = 'rgba(255,255,255,0.4)';
+                };
+                deleteBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  
+                  // Store position before re-render destroys the button
+                  const btnRect = targetBtn.getBoundingClientRect();
+                  
+                  // Remove from localStorage
+                  delete customThemes[key];
+                  localStorage.setItem('flowpath_custom_themes', JSON.stringify(customThemes));
+                  
+                  // If this was the active theme, switch to default
+                  if (currentThemeKey === key) {
+                    globalSettings.theme = 'umbrael';
+                    app.ui.settings.setSettingValue("🌊 FlowPath.Theme", 'umbrael');
+                  }
+                  
+                  // Re-render all FlowPath nodes
+                  app.graph._nodes.filter(n => n.comfyClass === "FlowPath").forEach(n => n.genSortRender?.());
+                  
+                  // Close dropdown - don't try to reopen as button is recreated
+                  dropdown.remove();
+                };
+                
+                item.appendChild(swatch);
+                item.appendChild(nameEl);
+                item.appendChild(deleteBtn);
+                
+                // Hover effect using theme color - also show delete button
+                item.onmouseenter = () => {
+                  if (currentThemeKey !== key) {
+                    item.style.background = theme.primaryLight;
+                  }
+                  deleteBtn.style.opacity = '1';
+                };
+                item.onmouseleave = () => {
+                  if (currentThemeKey !== key) {
+                    item.style.background = '';
+                  }
+                  deleteBtn.style.opacity = '0';
+                };
+                
+                item.onclick = () => {
+                  globalSettings.theme = key;
+                  app.ui.settings.setSettingValue("🌊 FlowPath.Theme", key);
+                  app.graph._nodes.filter(n => n.comfyClass === "FlowPath").forEach(n => n.genSortRender?.());
+                  dropdown.remove();
+                };
+                
+                dropdown.appendChild(item);
+              });
+            }
+            
+            // Create new theme option
+            const divider2 = document.createElement('div');
+            divider2.className = 'flowpath-theme-divider';
+            divider2.style.cssText = `height: 1px; background: ${theme.primaryLight}; margin: 4px 0;`;
+            dropdown.appendChild(divider2);
+            
+            const createItem = document.createElement('div');
+            createItem.className = 'flowpath-theme-create';
+            const MAX_CUSTOM_THEMES = 10;
+            const atLimit = Object.keys(customThemes).length >= MAX_CUSTOM_THEMES;
+            createItem.innerHTML = `<span>+</span><span>Create Custom Theme...${atLimit ? ' (limit reached)' : ''}</span>`;
+            createItem.style.cssText = `
+              padding: 8px 12px;
+              cursor: ${atLimit ? 'not-allowed' : 'pointer'};
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              color: ${atLimit ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.7)'};
+              font-size: 12px;
+              transition: all 0.15s;
+            `;
+            
+            if (!atLimit) {
+              createItem.onmouseenter = () => {
+                createItem.style.background = 'rgba(34, 197, 94, 0.15)';
+                createItem.style.color = '#22c55e';
+              };
+              createItem.onmouseleave = () => {
+                createItem.style.background = '';
+                createItem.style.color = 'rgba(255,255,255,0.7)';
+              };
+              createItem.onclick = () => {
+                dropdown.remove();
+                openThemeEditor();
+              };
+            } else {
+              // At limit - flash red on click
+              createItem.onclick = () => {
+                createItem.style.background = 'rgba(239, 68, 68, 0.3)';
+                createItem.style.color = '#ef4444';
+                setTimeout(() => {
+                  createItem.style.background = '';
+                  createItem.style.color = 'rgba(255,255,255,0.4)';
+                }, 300);
+              };
+            }
+            dropdown.appendChild(createItem);
+            
+            // Position dropdown
+            const rect = targetBtn.getBoundingClientRect();
+            dropdown.style.top = `${rect.bottom + 4}px`;
+            dropdown.style.left = `${rect.left}px`;
+            
+            document.body.appendChild(dropdown);
+            
+            // Adjust if off-screen
+            const dropRect = dropdown.getBoundingClientRect();
+            if (dropRect.right > window.innerWidth) {
+              dropdown.style.left = `${window.innerWidth - dropRect.width - 10}px`;
+            }
+            
+            // Close on outside click or canvas interaction (but allow dropdown scrolling)
+            const closeDropdown = () => {
+              if (!document.body.contains(dropdown)) return; // Already removed
+              dropdown.remove();
+              document.removeEventListener('mousedown', closeHandler, true);
+              document.removeEventListener('pointerdown', closeHandler, true);
+              document.removeEventListener('wheel', wheelHandler, true);
+              window.removeEventListener('blur', closeDropdown);
+            };
+            
+            const closeHandler = (e) => {
+              // Close on any click outside dropdown (left, middle, right)
+              if (!dropdown.contains(e.target) && e.target !== targetBtn) {
+                closeDropdown();
+              }
+            };
+            
+            const wheelHandler = (e) => {
+              // Only close if scrolling outside the dropdown
+              if (!dropdown.contains(e.target)) {
+                closeDropdown();
+              }
+            };
+            
+            setTimeout(() => {
+              // Use capture phase to get events before canvas handles them
+              document.addEventListener('mousedown', closeHandler, true);
+              document.addEventListener('pointerdown', closeHandler, true);
+              document.addEventListener('wheel', wheelHandler, true);
+              window.addEventListener('blur', closeDropdown);
+            }, 0);
+          };
+
           // Helper to attach mode button listeners
           const attachModeButtonListeners = () => {
             const saveBtn = preview.querySelector('.mode-btn-save');
             const saverBtn = preview.querySelector('.mode-btn-saver');
+            const themeBtn = preview.querySelector('.theme-dropdown-btn');
+            
+            // Theme dropdown button
+            if (themeBtn) {
+              themeBtn.onclick = (e) => {
+                e.stopPropagation();
+                openThemeDropdown(themeBtn);
+              };
+              themeBtn.onmouseenter = () => {
+                themeBtn.style.background = 'rgba(255,255,255,0.15)';
+                themeBtn.style.color = '#fff';
+              };
+              themeBtn.onmouseleave = () => {
+                themeBtn.style.background = 'rgba(0,0,0,0.2)';
+                themeBtn.style.color = 'rgba(255,255,255,0.6)';
+              };
+            }
             
             if (saveBtn) {
               saveBtn.onclick = () => {
@@ -3045,27 +4569,37 @@ app.registerExtension({
             `;
             addSegmentContainer.appendChild(addLabel);
 
-            const addSelect = document.createElement("select");
-            addSelect.className = "gensort-pro-select";
-            addSelect.style.cssText = `
+            // Custom dropdown button (solid background)
+            const addSelectBtn = document.createElement("div");
+            addSelectBtn.className = "flowpath-segment-dropdown-btn";
+            addSelectBtn.style.cssText = `
               flex: 1;
-              padding: 6px 10px;
-              background: #1a1a1a;
+              padding: 6px 12px;
+              background: #1a1a1f;
               border: 1px solid ${theme.primaryLight};
               border-radius: 6px;
-              color: #fff;
+              color: rgba(255, 255, 255, 0.6);
               font-size: 12px;
               cursor: pointer;
               transition: all 0.2s;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              user-select: none;
             `;
-
-            // Default option
-            const defaultOption = document.createElement("option");
-            defaultOption.value = "";
-            defaultOption.textContent = "-- Select to add --";
-            defaultOption.disabled = true;
-            defaultOption.selected = true;
-            addSelect.appendChild(defaultOption);
+            addSelectBtn.innerHTML = `
+              <span>-- Select to add --</span>
+              <span style="font-size: 8px; opacity: 0.6;">▼</span>
+            `;
+            
+            addSelectBtn.onmouseenter = () => {
+              addSelectBtn.style.borderColor = theme.primary;
+              addSelectBtn.style.background = '#252529';
+            };
+            addSelectBtn.onmouseleave = () => {
+              addSelectBtn.style.borderColor = theme.primaryLight;
+              addSelectBtn.style.background = '#1a1a1f';
+            };
 
             // Get ALL segment types that aren't currently in segments
             const allSegmentTypes = Object.keys(SEGMENT_TYPES).filter(type => type !== 'custom');
@@ -3073,57 +4607,213 @@ app.registerExtension({
               type => !segments.some(s => s.type === type)
             );
 
-            // Add options for available segment types
-            availableTypes.forEach(type => {
-              const segInfo = SEGMENT_TYPES[type];
-              const option = document.createElement("option");
-              option.value = type;
-              option.textContent = globalSettings.showEmojis ? `${segInfo.icon} ${segInfo.label}` : segInfo.label;
-              option.title = segInfo.tooltip || ""; // Add tooltip
-              addSelect.appendChild(option);
-            });
-
-            // Always add "Custom" option
-            const customOption = document.createElement("option");
-            customOption.value = "custom";
-            customOption.textContent = globalSettings.showEmojis ? "✨ Custom" : "Custom";
-            addSelect.appendChild(customOption);
-
-            addSelect.onchange = async () => {
-              const selectedType = addSelect.value;
+            // Toggle dropdown on click
+            addSelectBtn.onclick = (e) => {
+              e.stopPropagation();
               
-              if (selectedType === "custom") {
+              // Check if dropdown already exists (toggle behavior)
+              const existingDropdown = document.querySelector('.flowpath-segment-dropdown');
+              if (existingDropdown) {
+                existingDropdown.remove();
+                return;
+              }
+              
+              const dropdown = document.createElement('div');
+              dropdown.className = 'flowpath-segment-dropdown';
+              dropdown.style.cssText = `
+                position: fixed;
+                z-index: 10000;
+                min-width: 200px;
+                max-height: 280px;
+                overflow-y: auto;
+                background: #1a1a1f;
+                border: 1px solid ${theme.primary};
+                border-radius: 6px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.05);
+                padding: 4px 0;
+                scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.03);
+              `;
+              
+              // Add themed scrollbar via inline style element (subtle glass style)
+              const scrollStyle = document.createElement('style');
+              scrollStyle.textContent = `
+                .flowpath-segment-dropdown::-webkit-scrollbar {
+                  width: 10px;
+                }
+                .flowpath-segment-dropdown::-webkit-scrollbar-track {
+                  background: rgba(255, 255, 255, 0.03);
+                  border-radius: 5px;
+                }
+                .flowpath-segment-dropdown::-webkit-scrollbar-thumb {
+                  background: rgba(255, 255, 255, 0.18);
+                  border-radius: 5px;
+                  border: 1px solid rgba(255, 255, 255, 0.08);
+                }
+                .flowpath-segment-dropdown::-webkit-scrollbar-thumb:hover {
+                  background: rgba(255, 255, 255, 0.28);
+                }
+              `;
+              dropdown.appendChild(scrollStyle);
+              
+              // Title
+              const title = document.createElement('div');
+              title.style.cssText = `
+                padding: 6px 10px;
+                font-size: 9px;
+                font-weight: 600;
+                color: ${theme.accent};
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                border-bottom: 1px solid ${theme.primaryLight};
+              `;
+              title.textContent = 'Add Segment';
+              dropdown.appendChild(title);
+              
+              // Add available segment options
+              availableTypes.forEach(type => {
+                const segInfo = SEGMENT_TYPES[type];
+                const item = document.createElement('div');
+                item.style.cssText = `
+                  padding: 8px 12px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  transition: background 0.15s;
+                `;
+                
+                if (globalSettings.showEmojis) {
+                  const icon = document.createElement('span');
+                  icon.textContent = segInfo.icon;
+                  icon.style.fontSize = '14px';
+                  item.appendChild(icon);
+                }
+                
+                const label = document.createElement('span');
+                label.textContent = segInfo.label;
+                label.style.cssText = 'color: rgba(255, 255, 255, 0.9); font-size: 12px;';
+                item.appendChild(label);
+                
+                if (segInfo.tooltip) {
+                  item.title = segInfo.tooltip;
+                }
+                
+                item.onmouseenter = () => {
+                  item.style.background = theme.primaryLight;
+                };
+                item.onmouseleave = () => {
+                  item.style.background = '';
+                };
+                
+                item.onclick = () => {
+                  segments.push({ type: type, enabled: true });
+                  activePresetName = null;
+                  updateWidgetData();
+                  renderUI();
+                  updateNodeSize();
+                  dropdown.remove();
+                };
+                
+                dropdown.appendChild(item);
+              });
+              
+              // Divider before Custom
+              const divider = document.createElement('div');
+              divider.style.cssText = `height: 1px; background: ${theme.primaryLight}; margin: 4px 0;`;
+              dropdown.appendChild(divider);
+              
+              // Custom option
+              const customItem = document.createElement('div');
+              customItem.style.cssText = `
+                padding: 8px 12px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: background 0.15s;
+              `;
+              
+              if (globalSettings.showEmojis) {
+                const customIcon = document.createElement('span');
+                customIcon.textContent = '✨';
+                customIcon.style.fontSize = '14px';
+                customItem.appendChild(customIcon);
+              }
+              
+              const customLabel = document.createElement('span');
+              customLabel.textContent = 'Custom';
+              customLabel.style.cssText = 'color: rgba(255, 255, 255, 0.9); font-size: 12px;';
+              customItem.appendChild(customLabel);
+              
+              customItem.onmouseenter = () => {
+                customItem.style.background = theme.primaryLight;
+              };
+              customItem.onmouseleave = () => {
+                customItem.style.background = '';
+              };
+              
+              customItem.onclick = async () => {
+                dropdown.remove();
                 const name = await showInputDialog("Custom Template", "", "Example: {model}_{resolution}");
                 if (name) {
                   segments.push({ type: "custom", value: name, enabled: true });
-                  activePresetName = null; // Clear active preset on user modification
+                  activePresetName = null;
                   updateWidgetData();
                   renderUI();
                   updateNodeSize();
                 }
-              } else if (selectedType) {
-                segments.push({ type: selectedType, enabled: true });
-                activePresetName = null; // Clear active preset on user modification
-                updateWidgetData();
-                renderUI();
-                updateNodeSize();
+              };
+              
+              dropdown.appendChild(customItem);
+              
+              // Position dropdown
+              const rect = addSelectBtn.getBoundingClientRect();
+              dropdown.style.top = `${rect.bottom + 4}px`;
+              dropdown.style.left = `${rect.left}px`;
+              dropdown.style.minWidth = `${rect.width}px`;
+              
+              document.body.appendChild(dropdown);
+              
+              // Adjust if off-screen
+              const dropRect = dropdown.getBoundingClientRect();
+              if (dropRect.right > window.innerWidth) {
+                dropdown.style.left = `${window.innerWidth - dropRect.width - 10}px`;
+              }
+              if (dropRect.bottom > window.innerHeight) {
+                dropdown.style.top = `${rect.top - dropRect.height - 4}px`;
               }
               
-              // Reset dropdown
-              addSelect.value = "";
+              // Close handlers
+              const closeDropdown = () => {
+                if (!document.body.contains(dropdown)) return;
+                dropdown.remove();
+                document.removeEventListener('mousedown', closeHandler, true);
+                document.removeEventListener('pointerdown', closeHandler, true);
+                document.removeEventListener('wheel', wheelHandler, true);
+                window.removeEventListener('blur', closeDropdown);
+              };
+              
+              const closeHandler = (e) => {
+                if (!dropdown.contains(e.target) && e.target !== addSelectBtn) {
+                  closeDropdown();
+                }
+              };
+              
+              const wheelHandler = (e) => {
+                if (!dropdown.contains(e.target)) {
+                  closeDropdown();
+                }
+              };
+              
+              setTimeout(() => {
+                document.addEventListener('mousedown', closeHandler, true);
+                document.addEventListener('pointerdown', closeHandler, true);
+                document.addEventListener('wheel', wheelHandler, true);
+                window.addEventListener('blur', closeDropdown);
+              }, 0);
             };
 
-            addSelect.onfocus = () => {
-              addSelect.style.borderColor = theme.primary;
-              addSelect.style.boxShadow = `0 0 0 2px ${theme.primaryLight}`;
-            };
-            
-            addSelect.onblur = () => {
-              addSelect.style.borderColor = theme.primaryLight;
-              addSelect.style.boxShadow = 'none';
-            };
-
-            addSegmentContainer.appendChild(addSelect);
+            addSegmentContainer.appendChild(addSelectBtn);
             segmentsSection.content.appendChild(addSegmentContainer);
           } else {
             segmentsContentEl = null;
@@ -3999,7 +5689,8 @@ app.registerExtension({
             }
             
             const previewColor = previewIsEmpty ? 'rgba(239, 68, 68, 0.8)' : '#fff';
-            filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: ${previewColor}; ${previewIsEmpty ? 'font-style: italic;' : ''}">${filenamePreviewText}</span>`;
+            // Security: escape user content to prevent XSS
+            filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: ${previewColor}; ${previewIsEmpty ? 'font-style: italic;' : ''}">${escapeHtml(filenamePreviewText)}</span>`;
             filenameSection.content.appendChild(filenamePreview);
 
             // Filename input row with info icon
@@ -4079,7 +5770,8 @@ app.registerExtension({
                 previewText = replaceTemplateVars(filenameInput.value, true);
               }
               const pColor = isEmpty ? 'rgba(239, 68, 68, 0.8)' : '#fff';
-              filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: ${pColor}; ${isEmpty ? 'font-style: italic;' : ''}">${previewText}</span>`;
+              // Security: escape user content to prevent XSS
+              filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: ${pColor}; ${isEmpty ? 'font-style: italic;' : ''}">${escapeHtml(previewText)}</span>`;
               filenamePreview.style.background = isEmpty ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.3)';
               filenamePreview.style.borderLeftColor = isEmpty ? 'rgba(239, 68, 68, 0.7)' : theme.secondary;
               
@@ -4118,12 +5810,19 @@ app.registerExtension({
             const flowPathVars = [
               { var: "{counter}", label: "Counter (scans folder)", configKey: null }, // Always available
               { var: "{name}", label: "Name", configKey: "name" },
+              { var: "{project}", label: "Project", configKey: "project_name" },
+              { var: "{series}", label: "Series", configKey: "series_name" },
               { var: "{label}", label: "Label", configKey: "node_label" },
-              { var: "{lora}", label: "LoRA", configKey: "lora_name" },
               { var: "{model}", label: "Model", configKey: "model_name" },
+              { var: "{lora}", label: "LoRA", configKey: "lora_name" },
+              { var: "{seed}", label: "Seed (dynamic)", configKey: null }, // Dynamic at runtime
               { var: "{category}", label: "Category", configKey: "category" },
+              { var: "{rating}", label: "Rating (SFW/NSFW)", configKey: "content_rating" },
+              { var: "{resolution}", label: "Resolution", configKey: "resolution" },
               { var: "{date}", label: "Date", configKey: null }, // Always available (uses current date)
-              { var: "{resolution}", label: "Resolution", configKey: "resolution" }
+              { var: "{year}", label: "Year", configKey: null },
+              { var: "{month}", label: "Month", configKey: null },
+              { var: "{day}", label: "Day", configKey: null }
             ];
 
             const flowPathBtnsRow = document.createElement("div");
@@ -4176,7 +5875,8 @@ app.registerExtension({
                 updatePreview();
                 // Update filename section preview and warning
                 const previewText = replaceTemplateVars(filenameInput.value, true);
-                filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${previewText}</span>`;
+                // Security: escape user content to prevent XSS
+                filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${escapeHtml(previewText)}</span>`;
                 filenamePreview.style.background = 'rgba(0, 0, 0, 0.3)';
                 filenamePreview.style.borderLeftColor = theme.secondary;
                 updateFilenameWarning();
@@ -4187,14 +5887,16 @@ app.registerExtension({
             });
             quickInsertContainer.appendChild(flowPathBtnsRow);
 
-            // Image Saver variables section
+            // Image Saver variables section - same styling as FlowPath vars
             const imageSaverVarsLabel = document.createElement("div");
             imageSaverVarsLabel.style.cssText = `
-              color: ${theme.secondary};
+              color: ${theme.accent};
               font-size: 11px;
               font-weight: 600;
-              margin-top: 6px;
+              margin-top: 8px;
               margin-bottom: 2px;
+              padding-top: 6px;
+              border-top: 1px solid ${theme.primaryLight};
             `;
             imageSaverVarsLabel.textContent = "Image Saver Variables (pass-through):";
             quickInsertContainer.appendChild(imageSaverVarsLabel);
@@ -4218,26 +5920,24 @@ app.registerExtension({
             imageSaverVars.forEach(item => {
               const btn = document.createElement("button");
               btn.textContent = item.var;
-              btn.title = `Insert ${item.label} (processed by Image Saver)`;
+              btn.title = `Insert ${item.label} (processed by Image Saver node)`;
               btn.style.cssText = `
                 padding: 4px 8px;
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid ${theme.secondary};
+                background: ${theme.primaryLight};
+                border: 1px solid ${theme.primary};
                 border-radius: 4px;
-                color: ${theme.secondary};
+                color: #fff;
                 font-size: 10px;
                 font-family: 'Consolas', 'Monaco', monospace;
                 cursor: pointer;
                 transition: all 0.2s;
               `;
               btn.onmouseover = () => {
-                btn.style.background = theme.secondary;
-                btn.style.color = '#fff';
+                btn.style.background = theme.primary;
                 btn.style.transform = 'scale(1.05)';
               };
               btn.onmouseout = () => {
-                btn.style.background = 'rgba(255, 255, 255, 0.1)';
-                btn.style.color = theme.secondary;
+                btn.style.background = theme.primaryLight;
                 btn.style.transform = 'scale(1)';
               };
               btn.onclick = (e) => {
@@ -4255,7 +5955,8 @@ app.registerExtension({
                 updatePreview();
                 // Update filename section preview and warning
                 const previewText = replaceTemplateVars(filenameInput.value, true);
-                filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${previewText}</span>`;
+                // Security: escape user content to prevent XSS
+                filenamePreview.innerHTML = `<span style="color: rgba(255, 255, 255, 0.6);">Preview:</span> <span style="color: #fff;">${escapeHtml(previewText)}</span>`;
                 filenamePreview.style.background = 'rgba(0, 0, 0, 0.3)';
                 filenamePreview.style.borderLeftColor = theme.secondary;
                 updateFilenameWarning();
@@ -5148,6 +6849,17 @@ app.registerExtension({
             donationBanner.appendChild(bannerContent);
             donationBanner.appendChild(closeBtn);
             container.appendChild(donationBanner);
+            
+            // Make the Ko-fi link actually clickable (canvas may block default behavior)
+            const kofiLink = bannerText.querySelector('a');
+            if (kofiLink) {
+              kofiLink.style.cursor = 'pointer';
+              kofiLink.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open('https://ko-fi.com/maarten_harms', '_blank');
+              };
+            }
           }
 
           updateNodeSize();
