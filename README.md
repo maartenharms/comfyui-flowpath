@@ -645,6 +645,14 @@ See [LICENSE](LICENSE) file for full details.
 
 ---
 
+## 🔗 Also By Me
+
+| Extension | Description |
+|-----------|-------------|
+| [**PromptFlow**](https://github.com/maartenharms/comfyui-promptflow) | Modular prompt engineering for ComfyUI - wildcards, variations preview, auto-sort, presets, and 7 shared themes |
+
+---
+
 ## 🙏 Credits
 
 Created by **Maarten Harms** (Mern)
