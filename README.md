@@ -4,6 +4,7 @@
 [![GitHub license](https://img.shields.io/github/license/maartenharms/comfyui-flowpath)](https://github.com/maartenharms/comfyui-flowpath/blob/main/LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/maartenharms/comfyui-flowpath)](https://github.com/maartenharms/comfyui-flowpath/stargazers)
 [![GitHub release](https://img.shields.io/github/v/release/maartenharms/comfyui-flowpath)](https://github.com/maartenharms/comfyui-flowpath/releases)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-ff5f5f?logo=ko-fi)](https://ko-fi.com/maartenharms)
 
 [Features](#-key-features) | [Installation](#-quick-start) | [Segments](#-available-segments) | [Presets](#-preset-system) | [Examples](examples/) | [Support](#-support-development)
 
